@@ -93,7 +93,7 @@ APP.post('/register', async (req: Request, res: Response, next: NextFunction) =>
 });
 APP.post('/login', async (req: Request, res: Response, next: NextFunction) => {
 
-    const { username, password } = req.body;
+    const { username, password } = req.body; // pulls the username and password from the body
     let user = await UserModel.findOne({ username });
 
     if (!user) return res.redirect('/login');
