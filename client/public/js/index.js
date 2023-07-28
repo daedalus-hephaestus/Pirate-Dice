@@ -3,7 +3,7 @@ function setup() {
 }
 
 function draw() {
-	background(200);
+	background(255, 0, 0);
 }
 
 function touchStarted() {
