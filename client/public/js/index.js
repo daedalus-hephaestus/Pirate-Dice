@@ -1,22 +1,18 @@
-function setup() {
-	createCanvas(windowWidth, windowHeight);
-}
+function sketch(p) {
+	p.preload = function () {
+		
+	};
+	p.setup = function () {
+		p.createCanvas(p.windowWidth, p.windowHeight);
+		
+	};
+	p.draw = function () {
+		p.background(255, 0, 0)
+	};
 
-function draw() {
-	background(255, 0, 0);
+	p.keyPressed = function () {
+	};
+	p.keyReleased = function () {
+	};
 }
-
-function touchStarted() {
-	var fs = fullscreen();
-	if (!fs) {
-		fullscreen(true);
-	}
-}
-
-function windowResized() {
-	resizeCanvas(windowWidth, windowHeight);
-}
-
-document.ontouchmove = function (event) {
-	event.preventDefault();
-};
+new p5(sketch, 'container');
