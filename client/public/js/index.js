@@ -13,9 +13,6 @@ function touchStarted() {
 	}
 }
 
-function windowResized() {
-	resizeCanvas(windowWidth, windowHeight);
-}
 
 document.ontouchmove = function (event) {
 	event.preventDefault();
