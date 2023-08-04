@@ -82,6 +82,7 @@ IO.on('connection', (socket: Socket) => {
 		if (data.room.length == 0) {
 			new Room(socket.id, limit);
 		} else {
+			data.room = data.room.toUpperCase();
 			if (ROOMS[data.room]) {
 				socket.emit('join', ROOMS[data.room].join(socket.id));
 			} else {
