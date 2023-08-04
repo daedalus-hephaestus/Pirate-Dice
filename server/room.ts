@@ -34,6 +34,7 @@ export class Room {
 		if (this.state !== 'waiting') return user.socket.emit('room-unjoinable');
 
 		this.players[socketID] = new Player(socketID); // creates a new player
+        if (user.username != this.owner) user.socket.emit('room-joined', this.id);
 
 		// if the player is already in a room, make the player leave previous room
 		if (user.room) ROOMS[user.room].leave(socketID);

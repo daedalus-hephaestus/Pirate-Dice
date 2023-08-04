@@ -5,15 +5,19 @@ export class Room {
         this.id = generateId(5); // generates a random 5 letter code for the room
         this.state = 'waiting'; // the game state: waiting, playing, over
         this.players = {}; // the array of players
+        let ownerData = SOCKETS[ownerSocketID];
         this.ownerSocketID = ownerSocketID;
         this.limit = limit;
-        this.owner = SOCKETS[ownerSocketID].username;
+        this.owner = ownerData.username;
+        ownerData.socket.emit('owner', this.id);
         console.log(`${this.owner} has created a new room: ${this.id}`);
         this.join(ownerSocketID); // makes the owner join the game
         ROOMS[this.id] = this; // saves the room to the room object
     }
     join(socketID) {
         let user = SOCKETS[socketID];
+        if (user.room == this.id)
+            return; // if the user is already in the room
         // the amount of space in the room
         let space = this.limit - Object.keys(this.players).length;
         // if the room is full
@@ -23,6 +27,8 @@ export class Room {
         if (this.state !== 'waiting')
             return user.socket.emit('room-unjoinable');
         this.players[socketID] = new Player(socketID); // creates a new player
+        if (user.username != this.owner)
+            user.socket.emit('room-joined', this.id);
         // if the player is already in a room, make the player leave previous room
         if (user.room)
             ROOMS[user.room].leave(socketID);

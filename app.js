@@ -47,10 +47,13 @@ IO.on('connection', (socket) => {
         logoutUser(socket);
     });
     socket.on('play', (data) => __awaiter(void 0, void 0, void 0, function* () {
+        let limit = Number(data.number) || 6;
+        if (limit < 0)
+            limit = 6;
         if (socket.username == undefined)
             yield guestLogin(socket);
         if (data.room.length == 0) {
-            new Room(socket.id, 6);
+            new Room(socket.id, limit);
         }
         else {
             if (ROOMS[data.room]) {

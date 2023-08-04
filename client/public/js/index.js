@@ -4,6 +4,7 @@ let cookie = getCookie('auth_cookie');
 if (cookie) SOCKET.emit('auth-cookie', cookie);
 
 let authUsername;
+let roomName = '';
 let newClick = true;
 let view = 'login';
 
@@ -11,8 +12,11 @@ let form = {};
 let game = {};
 let play;
 let logout;
-
+let playerLimit;
 let roomCode;
+
+let owner = false;
+let ownerButton;
 
 function setup() {
 	createCanvas(windowWidth, windowHeight);
@@ -21,7 +25,15 @@ function setup() {
 	form.email = new input('text', 10, 40, 200, 'email');
 	form.password1 = new input('password', 10, 70, 200, 'password');
 	form.password2 = new input('password', 10, 100, 200, 'repeat password');
-	roomCode = new input('text', 10, 200, 100, 'room code');
+
+	playerLimit = new input('number', 10, 200, 100, 'player number');
+	playerLimit.element.attribute('min', 2);
+	playerLimit.element.attribute('max', 100);
+
+	roomCode = new input('text', 110, 200, 100, 'room code');
+	ownerButton = new button(100, 20, 'play', () => {
+		SOCKET.emit('start-game');
+	});
 	form.register = new button(100, 20, 'register', () => {
 		let result = checkInputs(
 			form.username.value(),
@@ -52,7 +64,10 @@ function setup() {
 			: alert(result);
 	});
 	play = new button(100, 20, 'play', () => {
-		SOCKET.emit('play', { room: roomCode.value() });
+		SOCKET.emit('play', {
+			room: roomCode.value(),
+			number: playerLimit.value(),
+		});
 	});
 	logout = new button(100, 20, 'logout', () => {
 		SOCKET.emit('logout');
@@ -63,21 +78,55 @@ function setup() {
 }
 function draw() {
 	background(200);
-
-	if (!authUsername) {
-		form.register.draw(10, 130);
-		form.login.draw(110, 130);
-	} else {
-		logout.draw(10, 10);
+	switch (view) {
+		case 'login':
+			login();
+			break;
+		case 'lobby':
+			lobby();
+			break;
+		case 'setup':
+			gameSetup();
+			break;
 	}
-
-	play.draw(110, 200);
 }
 function windowResized() {
 	resizeCanvas(windowWidth, windowHeight);
 }
 function hover(x, y, width, height) {
 	return mouseX > x && mouseY > y && mouseX < x + width && mouseY < y + height;
+}
+
+function login() {
+	form.register.draw(10, 130);
+	form.login.draw(110, 130);
+	play.draw(210, 200);
+}
+function lobby() {
+	form.username.hide();
+	form.email.hide();
+	form.password1.hide();
+	form.password2.hide();
+
+	logout.draw(10, 10);
+	play.draw(210, 200);
+}
+function gameSetup() {
+	form.username.hide();
+	form.email.hide();
+	form.password1.hide();
+	form.password2.hide();
+	playerLimit.hide();
+	roomCode.hide();
+
+	logout.draw(10, 10);
+
+	fill(0, 0, 0);
+	noStroke();
+	textAlign(LEFT, TOP);
+	text(`ROOM #: ${roomName}`, 120, 10);
+
+	owner ? ownerButton.draw(10, 100) : text('waiting for game to start...', 10, 100);
 }
 
 class button {
@@ -162,10 +211,6 @@ SOCKET.on('unavailable', (data) => {
 });
 SOCKET.on('correct', (username) => {
 	authUsername = username;
-	form.username.hide();
-	form.email.hide();
-	form.password1.hide();
-	form.password2.hide();
 	view = 'lobby';
 });
 SOCKET.on('incorrect', () => {
@@ -192,7 +237,16 @@ SOCKET.on('room-full', () => {
 });
 SOCKET.on('room-not-found', () => {
 	alert('room not found');
-})
+});
 SOCKET.on('logout', () => {
 	window.location.reload();
 });
+SOCKET.on('owner', (data) => {
+	owner = true;
+	roomName = data;
+	view = 'setup';
+});
+SOCKET.on('room-joined', (data) => {
+	roomName = data;
+	view = 'setup';
+})

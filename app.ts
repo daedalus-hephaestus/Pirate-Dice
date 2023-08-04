@@ -12,7 +12,7 @@ import {
 	loginCheck,
 	sessionCheck,
 	logoutUser,
-    guestLogin,
+	guestLogin,
 } from './server/auth.js';
 
 import mongoose, { Model, trusted } from 'mongoose';
@@ -76,16 +76,18 @@ IO.on('connection', (socket: Socket) => {
 		logoutUser(socket);
 	});
 	socket.on('play', async (data) => {
-        if (socket.username == undefined) await guestLogin(socket);
+		let limit = Number(data.number) || 6;
+		if (limit < 0) limit = 6;
+		if (socket.username == undefined) await guestLogin(socket);
 		if (data.room.length == 0) {
-            new Room(socket.id, 6);
-        } else {
-            if (ROOMS[data.room]) {
-                socket.emit('join', ROOMS[data.room].join(socket.id));
-            } else {
-                socket.emit('room-not-found');
-            }
-        }
+			new Room(socket.id, limit);
+		} else {
+			if (ROOMS[data.room]) {
+				socket.emit('join', ROOMS[data.room].join(socket.id));
+			} else {
+				socket.emit('room-not-found');
+			}
+		}
 	});
 });
 
