@@ -6,7 +6,6 @@
         "target": "ES6"
     },
     "files": [
-        "app.ts",
-        "server/mailer.ts",
+        "app.ts"
     ]
 }

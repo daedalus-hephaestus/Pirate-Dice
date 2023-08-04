@@ -1,26 +1,45 @@
 import mongoose, { Schema } from 'mongoose';
 
 const userSchema = new Schema({
+	username: {
+		type: String,
+		required: true,
+		unique: true,
+	},
+	username_case: {
+		type: String,
+		required: true,
+		unique: true,
+	},
+	email: {
+		type: String,
+		required: true,
+		unique: true,
+	},
+	password: {
+		type: String,
+		required: true,
+	},
+});
 
-    username: {
+const sessionSchema = new Schema({
+	cookie: {
+		type: String,
+		required: true,
+		unique: true
+	},
+	username: {
+		type: String,
+		required: true
+	},
+	createdAt: {
 
-        type: String,
-        required: true,
-        unique: true
+        type: Date,
+        default: Date.now(),
+        expires: 604800000 // stay logged in for seven days
 
     },
-    password: {
-
-        type: String,
-        required: true
-
-    },
-    chars: {
-
-        type: [String]
-
-    }
-
 });
 
 export const UserModel = mongoose.model('User', userSchema);
+export const SessionModel = mongoose.model('Session', sessionSchema);
