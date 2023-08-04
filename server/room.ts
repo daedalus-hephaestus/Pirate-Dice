@@ -6,15 +6,24 @@ export class Room {
 	id = generateId(5); // generates a random 5 letter code for the room
 	owner: string; // the username of the owner
 	ownerSocketID: string; // the socket id of the owner
-	state = 'waiting'; // the game state: waiting, playing, over
+	status = 'waiting'; // the game state: waiting, playing, over
 	limit: number; // the amount of people allowed in the game
 	players = {}; // the array of players
+	turn = 0;
+	startBet = 0;
+	bets = [];
 	constructor(ownerSocketID: string, limit: number) {
-        let ownerData = SOCKETS[ownerSocketID];
+		let ownerData = SOCKETS[ownerSocketID];
+		ownerData.socket.on('start-game', () => {
+			if (Object.keys(this.players).length > 1) {
+				this.status = 'roll';
+				this.update();
+			}
+		});
 		this.ownerSocketID = ownerSocketID;
 		this.limit = limit;
 		this.owner = ownerData.username;
-        ownerData.socket.emit('owner', this.id);
+		ownerData.socket.emit('owner', this.id);
 
 		console.log(`${this.owner} has created a new room: ${this.id}`);
 
@@ -24,21 +33,34 @@ export class Room {
 	join(socketID: string) {
 		let user = SOCKETS[socketID];
 
-        if (user.room == this.id) return; // if the user is already in the room
+		if (user.room == this.id) return; // if the user is already in the room
 		// the amount of space in the room
 		let space = this.limit - Object.keys(this.players).length;
 
 		// if the room is full
 		if (space <= 0) return user.socket.socket.emit('room-full');
 		// if the game is already being played
-		if (this.state !== 'waiting') return user.socket.emit('room-unjoinable');
+		if (this.status !== 'waiting') return user.socket.emit('room-unjoinable');
 
 		this.players[socketID] = new Player(socketID); // creates a new player
-        if (user.username != this.owner) user.socket.emit('room-joined', this.id);
+		if (user.username != this.owner) user.socket.emit('room-joined', this.id);
+
+		user.socket.on('roll', () => {
+			this.roll(this.players[socketID]);
+		});
+		user.socket.on('bet', (data: any) => {
+			this.bet(
+				this.players[socketID],
+				Number(data.amount),
+				Number(data.number)
+			);
+		});
 
 		// if the player is already in a room, make the player leave previous room
 		if (user.room) ROOMS[user.room].leave(socketID);
 		user.room = this.id; // saves the players current room to their socket
+
+		this.update();
 
 		console.log(
 			`${user.username}: joined ${this.id}. ${space} ${
@@ -47,7 +69,86 @@ export class Room {
 		);
 	}
 	public() {}
-	update() {}
+	update() {
+		let playerList = Object.keys(this.players);
+		let playerPublic = playerList.map((p) => this.players[p].public());
+
+		if (this.turn + 1 > playerList.length) this.turn = 0;
+
+		if (this.status == 'roll') {
+			let betting = true;
+			playerList.forEach((p) => {
+				if (!this.players[p].rolled) betting = false;
+			});
+			if (betting) {
+				this.turn = this.startBet;
+				this.status = 'betting';
+				this.startBet++;
+
+				if (this.startBet + 1 > playerList.length) this.startBet = 0;
+				while (this.players[playerList[this.startBet]].out) this.startBet++;
+			}
+		}
+		if (this.status == 'betting') {
+			this.players[playerList[this.turn]].socket.emit('your-bet');
+		}
+
+		playerList.forEach((p) => {
+			// loops through all the players
+			let player = this.players[p]; // stores the player information
+
+			if (player.diceCount == 0) player.out = true; // if the player has no dice
+
+			// sends the info to each player
+			player.socket.emit('room-update', {
+				players: playerPublic, // the public data of the player
+				owner: this.owner, // who owns the room
+				limit: this.limit, // the amount of people allowed in the room
+				status: this.status, // the current play status of the room.
+				bets: this.bets,
+				turn: this.turn,
+			});
+		});
+	}
+	bet(player: Player, amount: number, number: number) {
+		if (player.socketID != Object.keys(this.players)[this.turn])
+			return player.socket.emit('not-your-turn');
+		if (number > 6 || amount <= 0 || number <= 0)
+			return player.socket.emit('invalid-bet');
+		if (this.bets.length == 0) {
+			this.turn++;
+			this.bets.push({
+				amount,
+				number,
+				username: player.username,
+			});
+			return this.update();
+		}
+
+		let lastBet = this.bets[this.bets.length - 1];
+		if (
+			lastBet.amount > amount || // if the player bets a smaller amount
+			(lastBet.amount == amount && lastBet.number >= number) // if the player bets the same amount with a smaller number
+		) {
+			return player.socket.emit('small-bet');
+		}
+		this.bets.push({
+			amount,
+			number,
+			username: player.username,
+		});
+		this.turn++;
+		this.update();
+		console.log(`${player.username} bet that there are ${amount} ${number}'s`);
+	}
+	roll(player: Player) {
+		if (this.status == 'roll' && player.dice.length == 0) {
+			player.dice = diceRoll(player.diceCount);
+			player.socket.emit('your-roll', player.dice);
+			player.rolled = true;
+			this.update();
+		}
+	}
 	leave(socketID: string) {
 		// if the leaving player is the owner
 		if (socketID == this.ownerSocketID) {
@@ -66,6 +167,7 @@ export class Room {
 			SOCKETS[socketID].socket.emit('room-closed');
 			delete this.players[socketID]; // deletes the player from the room
 			delete SOCKETS[socketID].room; // deletes the room from their socket
+			this.update();
 		}
 	}
 }
@@ -75,7 +177,11 @@ export class Player {
 	socketID: string; // the player's socket id
 	socket: Socket; // the players socket
 	diceCount = 5; // the amount of dice the player still has
+	dice = [];
+	rolled = false;
+	out = false;
 	constructor(socketID: string) {
+        this.socketID = socketID;
 		this.username = SOCKETS[socketID].username;
 		this.socket = SOCKETS[socketID].socket;
 	}
@@ -83,6 +189,7 @@ export class Player {
 		return {
 			username: this.username,
 			diceCount: this.diceCount,
+			rolled: this.rolled,
 		};
 	}
 }
