@@ -24,6 +24,7 @@ export class Room {
 	join(socketID: string) {
 		let user = SOCKETS[socketID];
 
+        if (user.room == this.id) return; // if the user is already in the room
 		// the amount of space in the room
 		let space = this.limit - Object.keys(this.players).length;
 
