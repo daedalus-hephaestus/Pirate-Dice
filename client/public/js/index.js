@@ -93,6 +93,9 @@ function setup() {
 			number: game.number.value(),
 		});
 	});
+	game.liarButton = new button(100, 20, 'liar', () => {
+		SOCKET.emit('liar');
+	});
 }
 function draw() {
 	background(200);
@@ -192,6 +195,7 @@ function playGame() {
 		game.number.show();
 		game.amount.show();
 		game.bet.draw(210, 90);
+		game.liarButton.draw(310, 90);
 
 		fill(0, 0, 0);
 		noStroke();
@@ -206,15 +210,30 @@ function playGame() {
 		for (let i = 0; i < game.bets.length; i++) {
 			let b = game.bets[i];
 			let message = ``;
-			authUsername == b.username
-				? (message += 'You')
-				: (message += b.username);
+			authUsername == b.username ? (message += 'You') : (message += b.username);
 			message += ' bet that there ';
 			message += b.amount == 1 ? `is` : `are`;
 			message += ` ${b.amount} ${b.number}`;
 			message += b.amount == 1 ? `` : `s`;
 			text(message, 10, 150 + i * 12);
 		}
+	} else if (game.status == 'review') {
+		game.yourRoll = [];
+		game.number.hide();
+		game.amount.hide();
+
+		fill(0, 0, 0);
+		noStroke();
+		textAlign(LEFT, TOP);
+		let bet = game.bets[game.bets.length - 1];
+
+		let message = bet.username == authUsername ? 'You' : `${bet.username}`;
+		message += ` bet that there `;
+		message += bet.amount == 1 ? `was` : `were`;
+		message += ` ${bet.amount} ${bet.number}`;
+		message += bet.amount == 1 ? `` : `s`;
+		message += ` but ${game.liar} called them a liar!`;
+		text(`${message}`, 10, 40);
 	}
 }
 
@@ -322,7 +341,7 @@ SOCKET.on('room-update', (data) => {
 	game.status = data.status;
 	game.bets = data.bets;
 	game.turn = data.turn;
-	console.log(game.bets);
+	game.liar = data.liar;
 });
 SOCKET.on('room-closed', () => {
 	view = 'lobby';

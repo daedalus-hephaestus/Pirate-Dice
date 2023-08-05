@@ -9,13 +9,16 @@ export class Room {
 	status = 'waiting'; // the game state: waiting, playing, over
 	limit: number; // the amount of people allowed in the game
 	players = {}; // the array of players
+	playerList: Array<string>;
 	turn = 0;
 	startBet = 0;
 	bets = [];
+	liarCall = '';
+	revealedDice = {};
 	constructor(ownerSocketID: string, limit: number) {
 		let ownerData = SOCKETS[ownerSocketID];
 		ownerData.socket.on('start-game', () => {
-			if (Object.keys(this.players).length > 1) {
+			if (this.playerList.length > 1) {
 				this.status = 'roll';
 				this.update();
 			}
@@ -33,9 +36,11 @@ export class Room {
 	join(socketID: string) {
 		let user = SOCKETS[socketID];
 
+		this.playerList = Object.keys(this.players);
+
 		if (user.room == this.id) return; // if the user is already in the room
 		// the amount of space in the room
-		let space = this.limit - Object.keys(this.players).length;
+		let space = this.limit - this.playerList.length;
 
 		// if the room is full
 		if (space <= 0) return user.socket.socket.emit('room-full');
@@ -55,6 +60,9 @@ export class Room {
 				Number(data.number)
 			);
 		});
+		user.socket.on('liar', () => {
+			this.liar(this.players[socketID]);
+		});
 
 		// if the player is already in a room, make the player leave previous room
 		if (user.room) ROOMS[user.room].leave(socketID);
@@ -68,16 +76,16 @@ export class Room {
 			} remaining`
 		);
 	}
-	public() {}
 	update() {
-		let playerList = Object.keys(this.players);
-		let playerPublic = playerList.map((p) => this.players[p].public());
+		this.playerList = Object.keys(this.players);
+		let playerPublic = this.playerList.map((p) => this.players[p].public());
+        let betsPublic = this.bets.map((b) => b.public());
 
-		if (this.turn + 1 > playerList.length) this.turn = 0;
+		if (this.turn + 1 > this.playerList.length) this.turn = 0;
 
 		if (this.status == 'roll') {
 			let betting = true;
-			playerList.forEach((p) => {
+			this.playerList.forEach((p) => {
 				if (!this.players[p].rolled) betting = false;
 			});
 			if (betting) {
@@ -85,15 +93,16 @@ export class Room {
 				this.status = 'betting';
 				this.startBet++;
 
-				if (this.startBet + 1 > playerList.length) this.startBet = 0;
-				while (this.players[playerList[this.startBet]].out) this.startBet++;
+				if (this.startBet + 1 > this.playerList.length) this.startBet = 0;
+				while (this.players[this.playerList[this.startBet]].out)
+					this.startBet++;
 			}
 		}
 		if (this.status == 'betting') {
-			this.players[playerList[this.turn]].socket.emit('your-bet');
+			this.players[this.playerList[this.turn]].socket.emit('your-bet');
 		}
 
-		playerList.forEach((p) => {
+		this.playerList.forEach((p) => {
 			// loops through all the players
 			let player = this.players[p]; // stores the player information
 
@@ -105,8 +114,10 @@ export class Room {
 				owner: this.owner, // who owns the room
 				limit: this.limit, // the amount of people allowed in the room
 				status: this.status, // the current play status of the room.
-				bets: this.bets,
+				bets: betsPublic,
 				turn: this.turn,
+				liar: this.liarCall,
+				dice: this.revealedDice,
 			});
 		});
 	}
@@ -117,11 +128,7 @@ export class Room {
 			return player.socket.emit('invalid-bet');
 		if (this.bets.length == 0) {
 			this.turn++;
-			this.bets.push({
-				amount,
-				number,
-				username: player.username,
-			});
+			new Bet(player, amount, number, this);
 			return this.update();
 		}
 
@@ -132,20 +139,75 @@ export class Room {
 		) {
 			return player.socket.emit('small-bet');
 		}
-		this.bets.push({
-			amount,
-			number,
-			username: player.username,
-		});
+		new Bet(player, amount, number, this);
 		this.turn++;
 		this.update();
-		console.log(`${player.username} bet that there are ${amount} ${number}'s`);
+	}
+	liar(player: Player) {
+		if (player.socketID != this.playerList[this.turn])
+			return player.socket.emit('not-your-turn');
+		if (this.bets.length <= 0) return player.socket.emit('no-bets');
+		this.liarCall = player.username;
+		this.status = 'review';
+
+		let lastBet = this.bets[this.bets.length - 1];
+		console.log(
+			this.betEval(
+				lastBet.player,
+				player,
+				'liar',
+				lastBet.amount,
+				lastBet.number
+			)
+		);
+
+		this.update();
+		setTimeout(() => {
+			this.reset();
+		}, 20000);
+	}
+	betEval(
+		better: Player,
+		accuser: Player,
+		accusation: string,
+		amount: number,
+		number: number
+	) {
+		let count = {};
+		this.playerList.forEach((p) => {
+			let player = this.players[p];
+			this.revealedDice[player.username] = player.dice;
+			for (let n of player.dice) {
+				count[n] == undefined ? (count[n] = 1) : count[n]++;
+			}
+		});
+
+		if (accusation == 'liar' && count[number] < amount) {
+            better.diceCount--;
+		} else {
+            accuser.diceCount--;
+		}
+		return count;
+	}
+	reset() {
+		this.status = 'roll';
+		this.liarCall = '';
+        this.bets = [];
+
+		this.playerList.forEach((p) => {
+			let player = this.players[p];
+			player.rolled = false;
+			player.dice = [];
+		});
+
+		this.update();
 	}
 	roll(player: Player) {
 		if (this.status == 'roll' && player.dice.length == 0) {
 			player.dice = diceRoll(player.diceCount);
 			player.socket.emit('your-roll', player.dice);
 			player.rolled = true;
+
 			this.update();
 		}
 	}
@@ -181,17 +243,37 @@ export class Player {
 	rolled = false;
 	out = false;
 	constructor(socketID: string) {
-        this.socketID = socketID;
 		this.username = SOCKETS[socketID].username;
 		this.socket = SOCKETS[socketID].socket;
+		this.socketID = socketID;
 	}
 	public() {
 		return {
 			username: this.username,
 			diceCount: this.diceCount,
+			id: this.socketID,
 			rolled: this.rolled,
 		};
 	}
+}
+
+export class Bet {
+    player: Player;
+	amount: number;
+	number: number;
+    constructor (player: Player, amount: number, number: number, room: Room) {
+        this.number = number;
+        this.amount = amount;
+        this.player = player;
+        room.bets.push(this);
+    }
+    public () {
+        return {
+            amount: this.amount,
+            number: this.number,
+            username: this.player.username
+        }
+    }
 }
 
 export function generateId(length: number): string {
