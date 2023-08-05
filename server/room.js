@@ -5,81 +5,100 @@ export class Room {
         this.id = generateId(5); // generates a random 5 letter code for the room
         this.status = 'waiting'; // the game state: waiting, playing, over
         this.players = {}; // the array of players
-        this.turn = 0;
-        this.startBet = 0;
-        this.bets = [];
-        this.liarCall = '';
-        this.revealedDice = {};
-        let ownerData = SOCKETS[ownerSocketID];
+        this.turn = 0; // stores the current player turn
+        this.startBet = 0; // stores the person who will start next turn
+        this.bets = []; // stores the bets
+        this.liarCall = ''; // stores the accuser
+        this.revealedDice = {}; // sends the revealed dice to the client
+        let ownerData = SOCKETS[ownerSocketID]; // gets the owners information
+        // start game socket
         ownerData.socket.on('start-game', () => {
+            // if there is more than 1 player
             if (this.playerList.length > 1) {
-                this.status = 'roll';
-                this.update();
+                this.status = 'roll'; // sets the game state to roll
+                this.update(); // runs the update function
             }
         });
-        this.ownerSocketID = ownerSocketID;
-        this.limit = limit;
-        this.owner = ownerData.username;
-        ownerData.socket.emit('owner', this.id);
-        console.log(`${this.owner} has created a new room: ${this.id}`);
+        this.ownerSocketID = ownerSocketID; // saves the owners socket
+        this.limit = limit; // the amount of people who can join the game
+        this.owner = ownerData.username; // saves the owner's username
+        ownerData.socket.emit('owner', this.id); // tells the room id to the owner's socket
         this.join(ownerSocketID); // makes the owner join the game
         ROOMS[this.id] = this; // saves the room to the room object
     }
     join(socketID) {
-        let user = SOCKETS[socketID];
-        this.playerList = Object.keys(this.players);
+        let user = SOCKETS[socketID]; // gets the user's information
+        this.playerList = Object.keys(this.players); // updates the player list
         if (user.room == this.id)
             return; // if the user is already in the room
-        // the amount of space in the room
-        let space = this.limit - this.playerList.length;
+        let space = this.limit - this.playerList.length; // the amount of space in the room
         // if the room is full
         if (space <= 0)
             return user.socket.socket.emit('room-full');
         // if the game is already being played
         if (this.status !== 'waiting')
             return user.socket.emit('room-unjoinable');
+        // if that username is already in the room
+        let present = false;
+        this.playerList.forEach((p) => {
+            if (this.players[p].username == user.username)
+                present = true;
+        });
+        if (present)
+            return user.socket.emit('in-room');
         this.players[socketID] = new Player(socketID); // creates a new player
+        // if the user is not the owner, send the room id
         if (user.username != this.owner)
             user.socket.emit('room-joined', this.id);
+        // when the player clicks the "roll" button
         user.socket.on('roll', () => {
             this.roll(this.players[socketID]);
         });
+        // when the player clicks the "bet" button
         user.socket.on('bet', (data) => {
-            this.bet(this.players[socketID], Number(data.amount), Number(data.number));
+            this.bet(this.players[socketID], // better's socketID
+            Number(data.amount), // amount of dice bet
+            Number(data.number) // the number on the dice that is bet
+            );
         });
+        // when the player clicks the "liar" button
         user.socket.on('liar', () => {
             this.liar(this.players[socketID]);
         });
-        // if the player is already in a room, make the player leave previous room
         if (user.room)
-            ROOMS[user.room].leave(socketID);
+            ROOMS[user.room].leave(socketID); // removes player from already existing room
         user.room = this.id; // saves the players current room to their socket
         this.update();
-        console.log(`${user.username}: joined ${this.id}. ${space} ${space == 1 ? 'slot' : 'slots'} remaining`);
     }
     update() {
-        this.playerList = Object.keys(this.players);
+        this.playerList = Object.keys(this.players); // refreshes the playerlist
+        // gets the public info for each player
         let playerPublic = this.playerList.map((p) => this.players[p].public());
+        /// gets the public info for each bet
         let betsPublic = this.bets.map((b) => b.public());
-        if (this.turn + 1 > this.playerList.length)
-            this.turn = 0;
+        // if the game stage is rolling
         if (this.status == 'roll') {
-            let betting = true;
+            let betting = true; // default true
+            // if a player has not rolled yet, betting stage has not begun
             this.playerList.forEach((p) => {
-                if (!this.players[p].rolled)
+                if (!this.players[p].rolled && !this.players[p].out)
                     betting = false;
             });
             if (betting) {
-                this.turn = this.startBet;
-                this.status = 'betting';
-                this.startBet++;
+                this.turn = this.startBet; // sets the turn to whoever starts the betting
+                this.status = 'betting'; // sets the game state to betting
+                this.startBet++; // moves the startbet to the next person
+                // if the start bet is greater than the nuber of players reset to 0
                 if (this.startBet + 1 > this.playerList.length)
                     this.startBet = 0;
+                // while the player is out, move to the next player
                 while (this.players[this.playerList[this.startBet]].out)
                     this.startBet++;
             }
         }
+        // if the game state is betting
         if (this.status == 'betting') {
+            // tell the player it is their turn to bet
             this.players[this.playerList[this.turn]].socket.emit('your-bet');
         }
         this.playerList.forEach((p) => {
@@ -96,58 +115,101 @@ export class Room {
                 bets: betsPublic,
                 turn: this.turn,
                 liar: this.liarCall,
-                dice: this.revealedDice,
+                dice: this.revealedDice, // the dice that have been revealed
             });
         });
     }
     bet(player, amount, number) {
-        if (player.socketID != Object.keys(this.players)[this.turn])
-            return player.socket.emit('not-your-turn');
-        if (number > 6 || amount <= 0 || number <= 0)
-            return player.socket.emit('invalid-bet');
-        if (this.bets.length == 0) {
-            this.turn++;
-            new Bet(player, amount, number, this);
-            return this.update();
-        }
-        let lastBet = this.bets[this.bets.length - 1];
-        if (lastBet.amount > amount || // if the player bets a smaller amount
-            (lastBet.amount == amount && lastBet.number >= number) // if the player bets the same amount with a smaller number
-        ) {
-            return player.socket.emit('small-bet');
-        }
-        new Bet(player, amount, number, this);
-        this.turn++;
-        this.update();
-    }
-    liar(player) {
+        // if the player tries to bet when it is not their turn
         if (player.socketID != this.playerList[this.turn])
             return player.socket.emit('not-your-turn');
+        // if the player bets a number that is not between 1 and 6, or a negative amount
+        if (number > 6 || number <= 0 || amount <= 0)
+            return player.socket.emit('invalid-bet'); // invalid bet
+        // if this is the first bet
+        if (this.bets.length == 0) {
+            this.nextTurn(); // advances to the next turn
+            new Bet(player, amount, number, this); // creates the bet
+            return this.update(); // updates the players
+        }
+        // gets the last bet made
+        let lastBet = this.bets[this.bets.length - 1];
+        // checks to make sure the bet is valid
+        if (
+        // if the player bets a smaller amount
+        lastBet.amount > amount ||
+            // if the player bets the same amount with a smaller number
+            (lastBet.amount == amount && lastBet.number >= number)) {
+            return player.socket.emit('small-bet');
+        }
+        new Bet(player, amount, number, this); // creates the bet
+        this.nextTurn(); // advances to the next turn
+        this.update(); // updates the players
+    }
+    nextTurn() {
+        this.turn++; // increments the turn
+        // if the turn is greater than the number of players, reset to 0
+        if (this.turn + 1 > this.playerList.length)
+            this.turn = 0;
+        // gets the player information of the current turn
+        let nextTurn = this.players[this.playerList[this.turn]];
+        // if that player is out, advance to the next turn
+        if (nextTurn.out)
+            this.nextTurn();
+    }
+    liar(player) {
+        // if the player calls liar when it is not their turn
+        if (player.socketID != this.playerList[this.turn])
+            return player.socket.emit('not-your-turn');
+        // if the player calls liar before there are any bets
         if (this.bets.length <= 0)
             return player.socket.emit('no-bets');
-        this.liarCall = player.username;
-        this.status = 'review';
-        let lastBet = this.bets[this.bets.length - 1];
-        console.log(this.betEval(lastBet.player, player, 'liar', lastBet.amount, lastBet.number));
-        this.update();
+        this.liarCall = player.username; // stores the name of the accuser
+        this.status = 'review'; // sets the game state to review
+        let lastBet = this.bets[this.bets.length - 1]; // gets the info of the last bet
+        // evaluates the bet
+        this.betEval(lastBet.player, // the accused player
+        player, // the accusing player
+        'liar', // the accusation
+        lastBet.amount, // the bet amount
+        lastBet.number // the bet number
+        );
+        this.update(); // updates the players
         setTimeout(() => {
-            this.reset();
-        }, 20000);
+            // pauses for 10 seconds
+            this.reset(); // resets the betting
+        }, 10000);
     }
     betEval(better, accuser, accusation, amount, number) {
-        let count = {};
+        let count = {}; // the total amount of each number of cie
+        // loops through the players and counts their dice
         this.playerList.forEach((p) => {
-            let player = this.players[p];
-            this.revealedDice[player.username] = player.dice;
-            for (let n of player.dice) {
-                count[n] == undefined ? (count[n] = 1) : count[n]++;
+            let player = this.players[p]; // gets the players info
+            // if the player is not out
+            if (!player.out) {
+                // sends each player's dice to the reveal dice object
+                this.revealedDice[player.username] = player.dice;
+                // loops through each player's dice
+                for (let n of player.dice) {
+                    // increments the dice count by 1
+                    count[n] == undefined ? (count[n] = 1) : count[n]++;
+                }
             }
         });
+        // checks who is lying
         if (accusation == 'liar' && count[number] < amount) {
-            better.diceCount--;
+            // if the better was lying about the amount of dice
+            better.diceCount--; // remove one dice
+            // if the better have no more dice, they are out
+            if (better.diceCount == 0)
+                better.out = true;
         }
         else {
-            accuser.diceCount--;
+            // if the better was telling the truth
+            accuser.diceCount--; // remove one dice from the accuser
+            // if the accuser has no more dice, they are out
+            if (accuser.diceCount == 0)
+                accuser.out = true;
         }
         return count;
     }
@@ -160,6 +222,15 @@ export class Room {
             player.rolled = false;
             player.dice = [];
         });
+        // calculates the number of players who are out
+        let playersOut = this.playerList.reduce((amount, p) => {
+            if (this.players[p].out)
+                amount++;
+            return amount;
+        }, 0);
+        // if there is only one player left, game is over
+        if (playersOut >= this.playerList.length - 1 && this.status != 'waiting')
+            this.status = 'over';
         this.update();
     }
     roll(player) {
@@ -207,6 +278,7 @@ export class Player {
             diceCount: this.diceCount,
             id: this.socketID,
             rolled: this.rolled,
+            out: this.out,
         };
     }
 }
@@ -221,7 +293,7 @@ export class Bet {
         return {
             amount: this.amount,
             number: this.number,
-            username: this.player.username
+            username: this.player.username,
         };
     }
 }

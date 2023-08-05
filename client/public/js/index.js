@@ -234,6 +234,20 @@ function playGame() {
 		message += bet.amount == 1 ? `` : `s`;
 		message += ` but ${game.liar} called them a liar!`;
 		text(`${message}`, 10, 40);
+
+		console.log(game.dice);
+		if (game.dice) {
+			let names = Object.keys(game.dice);
+			for (let i = 0; i < names.length; i++) {
+				text(
+					`${names[i] == authUsername ? 'you' : names} rolled ${game.dice[
+						names[i]
+					].join(', ')}`,
+					10,
+					60 + i * 12
+				);
+			}
+		}
 	}
 }
 
@@ -342,6 +356,7 @@ SOCKET.on('room-update', (data) => {
 	game.bets = data.bets;
 	game.turn = data.turn;
 	game.liar = data.liar;
+	game.dice = data.dice;
 });
 SOCKET.on('room-closed', () => {
 	view = 'lobby';
@@ -353,6 +368,9 @@ SOCKET.on('room-unjoinable', () => {
 SOCKET.on('room-full', () => {
 	alert('this room is full');
 });
+SOCKET.on('in-room', () => {
+	alert('you are already in this room');
+})
 SOCKET.on('room-not-found', () => {
 	alert('room not found');
 });
