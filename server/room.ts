@@ -85,6 +85,19 @@ export class Room {
 	update() {
 		this.playerList = Object.keys(this.players); // refreshes the playerlist
 
+        // if the turn is greater than the list of players
+        if (this.turn + 1 > this.playerList.length) this.turn = 0;
+
+        // calculates the number of players who are out
+		let playersOut = this.playerList.reduce((amount, p) => {
+			if (this.players[p].out) amount++;
+			return amount;
+		}, 0);
+
+		// if there is only one player left, game is over
+		if (playersOut >= this.playerList.length - 1 && this.status != 'waiting')
+			this.status = 'over';
+
 		// gets the public info for each player
 		let playerPublic = this.playerList.map((p) => this.players[p].public());
 		/// gets the public info for each bet
@@ -252,33 +265,25 @@ export class Room {
 		return count;
 	}
 	reset() {
-		this.status = 'roll';
-		this.liarCall = '';
-		this.bets = [];
+		this.status = 'roll'; // resets the status to roll
+		this.liarCall = ''; // resets the accuser string
+		this.bets = []; // resets the bets
 
+        // loops through all the players
 		this.playerList.forEach((p) => {
 			let player = this.players[p];
-			player.rolled = false;
-			player.dice = [];
+			player.rolled = false; // sets them to unrolled
+			player.dice = []; // resets the player's dice
 		});
-
-        // calculates the number of players who are out
-		let playersOut = this.playerList.reduce((amount, p) => {
-			if (this.players[p].out) amount++;
-			return amount;
-		}, 0);
-
-		// if there is only one player left, game is over
-		if (playersOut >= this.playerList.length - 1 && this.status != 'waiting')
-			this.status = 'over';
 
 		this.update();
 	}
 	roll(player: Player) {
-		if (this.status == 'roll' && player.dice.length == 0) {
-			player.dice = diceRoll(player.diceCount);
-			player.socket.emit('your-roll', player.dice);
-			player.rolled = true;
+        // if the player has not already rolled
+		if (this.status == 'roll' && !player.rolled) {
+			player.dice = diceRoll(player.diceCount); // generates a dice roll
+			player.socket.emit('your-roll', player.dice); // sends the roll to the player
+			player.rolled = true; // sets the roll variable to true
 
 			this.update();
 		}

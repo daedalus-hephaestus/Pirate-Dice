@@ -32,11 +32,11 @@ const sessionSchema = new Schema({
 		type: String,
 		required: true
 	},
-	createdAt: {
+	expireAt: {
 
         type: Date,
-        default: Date.now(),
-        expires: 604800000 // stay logged in for seven days
+		default: Date.now(),
+        expires: 7 * 24 * 60 * 60 // stay logged in for seven days
 
     },
 });
