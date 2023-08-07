@@ -228,6 +228,7 @@ class InputClass {
 
         this.input = document.createElement('input');
         this.input.maxLength = this.limit;
+        this.input.className = 'hiddeninput';
         document.getElementById('inputs').appendChild(this.input);
 
     }

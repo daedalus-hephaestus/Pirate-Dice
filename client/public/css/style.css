@@ -11,3 +11,6 @@ html {
     left: -10000px;
     overflow: hidden;
 }
+.hiddeninput {
+    font-size: 100px;
+}
