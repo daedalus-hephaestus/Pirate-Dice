@@ -4,8 +4,11 @@ if (cookie) SOCKET.emit('auth-cookie', cookie);
 
 let assets = {};
 let mainMenu = {};
+let login = {};
+let register = {};
 let newClick = true;
 let scene = 'menu';
+let font;
 
 SOCKET.on('assets', (data) => {
     let types = Object.keys(data);
@@ -69,7 +72,9 @@ SOCKET.on('invalid-bet', () => {
 function sketch(p) {
 
     let scenes = {
-        menu: menuScene
+        menu: menuScene,
+        login: loginScene,
+        register: registerScene
     };
 
     p.preload = function () {
@@ -79,7 +84,7 @@ function sketch(p) {
                 if (t == 'images') new ImageClass(a, assets[t][a], p);
             }
         }
-
+        font = p.loadFont('fonts/pixel_pirate.ttf');
     };
     p.setup = function () {
         p.createCanvas(p.windowWidth, p.windowHeight);
@@ -88,11 +93,15 @@ function sketch(p) {
                 assets[t][a].loadFrames();
             }
         }
-        mainMenu.play = new ButtonClass('play', () => {
-            console.log('click')
-            SOCKET.emit('play');
+        mainMenu.play = new ButtonClass('Play', 'button1', () => {
+            //SOCKET.emit('play');
         }, p);
-        mainMenu.login = new InputClass('text', 'login', 'input', 10, /[A-Za-z]/, p);
+        mainMenu.login = new ButtonClass('Login', 'button1', () => {
+            scene = 'login';
+        }, p);
+        mainMenu.register = new ButtonClass('Register', 'button1', () => {
+            scene = 'register';
+        }, p);
     };
     p.draw = function () {
         p.background(0, 0, 0);
@@ -113,8 +122,16 @@ function sketch(p) {
     };
 
     function menuScene(scale, center) {
-        mainMenu.play.draw(center.x - mainMenu.play.w / 2, 15, scale);
+        mainMenu.play.draw(center.x - mainMenu.play.w / 2, 5, scale);
         mainMenu.login.draw(center.x - mainMenu.login.w / 2, 50, scale);
+        mainMenu.register.draw(center.x - mainMenu.login.w / 2, 95, scale);
+    }
+
+    function loginScene(scale, center) {
+        
+    }
+    function registerScene(scale, center) {
+
     }
 
     p.windowResized = function () {
@@ -190,10 +207,11 @@ class ImageClass {
     }
 }
 class ButtonClass {
-    constructor(imageName, action, context) {
+    constructor(text, imageName, action, context) {
         this.imageName = imageName;
         this.action = action;
         this.image = assets.images[this.imageName];
+        this.text = text;
         this.w = this.image.w;
         this.h = this.image.h;
         this.c = context;
@@ -201,8 +219,13 @@ class ButtonClass {
     draw(x, y, scale = 1) {
         if (this.image) this.image.draw(x, y, scale);
 
+        this.c.fill(255, 255, 255);
+        this.c.noStroke();
+        this.c.textFont(font, 8 * scale);
+        this.c.textAlign(this.c.CENTER, this.c.CENTER);
+        this.c.text(this.text, (x + this.w / 2) * scale, (y + this.h / 2 + 2) * scale);
         if (this.hover(x, y, scale) && this.c.mouseIsPressed) {
-            //click(this.action);
+            click(this.action);
         }
     }
     hover(x, y, scale) {
@@ -236,11 +259,17 @@ class InputClass {
                 setTimeout(() => { this.input.focus({ preventScroll: true }) }, 200);
             });
         }
+
         this.c.fill(255, 255, 255);
         this.c.noStroke();
-        this.c.textSize(25);
+        this.c.textFont(font, 11 * scale);
         this.c.textAlign(this.c.LEFT, this.c.CENTER);
-        this.c.text(`${this.input.value}`, (x + 6) * scale, (y + this.h / 2 + 2) * scale);
+        let startIndex = 0;
+        let value = this.input.value;
+        while (this.c.textWidth(value.substring(startIndex, value.length)) > (this.w - 8) * scale) {
+            startIndex++;
+        }
+        this.c.text(`${this.input.value.substring(startIndex, this.input.value.length)}`, (x + 6) * scale, (y + this.h / 2 + 2) * scale);
     }
     hover(x, y, scale) {
         let horizontal = this.c.mouseX > x * scale && this.c.mouseX < x * scale + this.w * scale;
