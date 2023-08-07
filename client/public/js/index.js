@@ -235,7 +235,7 @@ class InputClass {
         if (this.image) this.image.draw(x, y, scale);
         if (this.hover(x, y, scale) && this.c.mouseIsPressed) {
             click(() => {
-                this.input.focus();
+                this.input.focus({ preventScroll: true });
             });
         }
         this.c.fill(255, 255, 255);
