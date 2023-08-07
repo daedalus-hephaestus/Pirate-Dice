@@ -236,14 +236,14 @@ class InputClass {
         if (this.image) this.image.draw(x, y, scale);
         if (this.hover(x, y, scale) && this.c.mouseIsPressed) {
             click(() => {
-                this.input.focus({ preventScroll: true });
+                setTimeout(() => { this.input.focus({ preventScroll: true }) }, 20);
             });
         }
         this.c.fill(255, 255, 255);
         this.c.noStroke();
         this.c.textSize(25);
         this.c.textAlign(this.c.LEFT, this.c.CENTER);
-        this.c.text(`${this.input.value}`, (x + 6)* scale, (y + this.h/2 + 2) * scale);
+        this.c.text(`${this.input.value}`, (x + 6) * scale, (y + this.h / 2 + 2) * scale);
     }
     hover(x, y, scale) {
         let horizontal = this.c.mouseX > x * scale && this.c.mouseX < x * scale + this.w * scale;
