@@ -41,6 +41,9 @@ const MONGO_URI = 'mongodb://127.0.0.1:27017/liars_dice';
 mongoose.connect(MONGO_URI);
 const db = mongoose.connection; // connects to the database
 
+const ASSETS = {};
+loadAssets();
+
 db.on('error', (error) => console.log(error));
 db.once('open', () => console.log(`${MONGO_URI} successfully connected`));
 
@@ -61,8 +64,7 @@ APP.get('/login', (req: Request, res: Response, next: NextFunction) =>
 const IO = new Server(HTTP_SERVER, {});
 
 IO.on('connection', (socket: Socket) => {
-	// socket.handshake.headers.cookie
-	socket.on('post', (data) => console.log(data));
+	socket.emit('assets', ASSETS);
 	socket.on('register', (data) => {
 		createUser(data.username, data.password, data.email, socket);
 	});
@@ -93,3 +95,11 @@ IO.on('connection', (socket: Socket) => {
 });
 
 HTTP_SERVER.listen(PORT, () => console.log(`App listening on ${PORT}`));
+
+function loadAssets() {
+	let files = fs.readdirSync(`client/public/assets`);
+	files.forEach(f => {
+		let assets = fs.readdirSync(`client/public/assets/${f}`);
+		ASSETS[f] = assets.map(a => `assets/${f}/${a}`);
+	});
+}

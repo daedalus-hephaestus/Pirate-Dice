@@ -7,6 +7,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+import * as fs from 'fs';
 import bodyParser from 'body-parser';
 import { ROOMS, Room } from './server/room.js';
 import { createUser, loginCheck, sessionCheck, logoutUser, guestLogin, } from './server/auth.js';
@@ -23,6 +24,8 @@ const IS_AUTH = (req, res, next) => req.session ? next() : res.redirect('/login'
 const MONGO_URI = 'mongodb://127.0.0.1:27017/liars_dice';
 mongoose.connect(MONGO_URI);
 const db = mongoose.connection; // connects to the database
+const ASSETS = {};
+loadAssets();
 db.on('error', (error) => console.log(error));
 db.once('open', () => console.log(`${MONGO_URI} successfully connected`));
 APP.use(bodyParser.urlencoded({ extended: false }));
@@ -32,8 +35,7 @@ APP.get('/', (req, res, next) => res.sendFile('html/index.html', { root: 'client
 APP.get('/login', (req, res, next) => res.sendFile('html/login.html', { root: 'client/public' }));
 const IO = new Server(HTTP_SERVER, {});
 IO.on('connection', (socket) => {
-    // socket.handshake.headers.cookie
-    socket.on('post', (data) => console.log(data));
+    socket.emit('assets', ASSETS);
     socket.on('register', (data) => {
         createUser(data.username, data.password, data.email, socket);
     });
@@ -67,3 +69,10 @@ IO.on('connection', (socket) => {
     }));
 });
 HTTP_SERVER.listen(PORT, () => console.log(`App listening on ${PORT}`));
+function loadAssets() {
+    let files = fs.readdirSync(`client/public/assets`);
+    files.forEach(f => {
+        let assets = fs.readdirSync(`client/public/assets/${f}`);
+        ASSETS[f] = assets.map(a => `assets/${f}/${a}`);
+    });
+}
