@@ -120,9 +120,6 @@ function sketch(p) {
     p.windowResized = function () {
         p.resizeCanvas(p.windowWidth, p.windowHeight);
     }
-
-    p.mousePressed = function () {
-    };
     p.mouseReleased = function () {
         newClick = true;
     }
