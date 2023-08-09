@@ -60,10 +60,10 @@ export async function createUser( // creates a new user
 ) {
 	if (!(await usernameAvailable(username)))
 		// checks if username is available
-		return socket.emit('unavailable', username);
+		return socket.emit('unavailable', 'username');
 	if (!(await emailAvailable(email)))
 		// checks if the email is available
-		return socket.emit('unavailable', email);
+		return socket.emit('unavailable', 'email');
 
 	let hash = await bcryptjs.hash(password, 12); // hashes the password
 

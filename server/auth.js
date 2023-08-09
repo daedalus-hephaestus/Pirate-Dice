@@ -64,10 +64,10 @@ username, password, email, socket) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!(yield usernameAvailable(username)))
             // checks if username is available
-            return socket.emit('unavailable', username);
+            return socket.emit('unavailable', 'username');
         if (!(yield emailAvailable(email)))
             // checks if the email is available
-            return socket.emit('unavailable', email);
+            return socket.emit('unavailable', 'email');
         let hash = yield bcryptjs.hash(password, 12); // hashes the password
         let user = new UserModel({
             // creates the user
