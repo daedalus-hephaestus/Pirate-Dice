@@ -4,6 +4,9 @@ if (cookie) SOCKET.emit('auth-cookie', cookie);
 
 let assets = {};
 let mainMenu = {};
+let loginMenu = {};
+let transforms = [];
+
 let login = {};
 let register = {};
 let newClick = true;
@@ -71,11 +74,7 @@ SOCKET.on('invalid-bet', () => {
 
 function sketch(p) {
 
-    let scenes = {
-        menu: menuScene,
-        login: loginScene,
-        register: registerScene
-    };
+    let center;
 
     p.preload = function () {
         for (let t in assets) {
@@ -93,49 +92,86 @@ function sketch(p) {
                 assets[t][a].loadFrames();
             }
         }
+
+        center = {
+            x: assets.images.table.w / 2,
+            y: p.windowHeight / 2
+        };
+
+
+
         mainMenu.play = new ButtonClass('Play', 'button1', () => {
             //SOCKET.emit('play');
         }, p);
         mainMenu.login = new ButtonClass('Login', 'button1', () => {
-            scene = 'login';
+            transforms.play.start();
         }, p);
         mainMenu.register = new ButtonClass('Register', 'button1', () => {
             scene = 'register';
         }, p);
+
+        loginMenu.username = new InputClass('text', 'username', 'input', 20, '[a-zA-Z0-9]', p);
+        loginMenu.password = new InputClass('password', 'password', 'input', 24, '', p)
+        loginMenu.login = new ButtonClass('Login', 'button1', () => {
+            // LOGIN SOCKET HERE
+        }, p);
+
+        new Transform('play', center.x - assets.images.button1.w / 2, -assets.images.button1.w, 40, 4, () => {
+            transforms.login.start();
+        }, () => { });
+        new Transform('login', center.x - assets.images.button1.w / 2, center.x * 2, 40, 4, () => {
+            transforms.register.start();
+        }, () => { });
+        new Transform('register', center.x - assets.images.button1.w / 2, -assets.images.button1.w, 40, 4, () => {
+            scene = 'login';
+            transforms.username.start();
+        }, () => { });
+        new Transform('username', -assets.images.input.w, center.x - assets.images.input.w / 2, 40, 4, () => {
+            transforms.password.start();
+        }, () => {
+            transforms.password.start(true);
+        });
+        new Transform('password', center.x * 2 + assets.images.input.w, center.x - assets.images.input.w / 2, 40, 4, () => {
+            transforms.login2.start();
+        }, () => {
+            transforms.login2.start(true);
+        })
+        new Transform('login2', -assets.images.button1.w, center.x - assets.images.button1.w / 2, 40, 4, () => { }, () => { })
+
     };
     p.draw = function () {
         p.background(0, 0, 0);
         p.noSmooth();
 
-        let scale = p.windowWidth / assets.images.table.w;
-        let center = {
-            x: assets.images.table.w / 2,
-            y: p.windowHeight / 2
+        for (let t in transforms) {
+            if (transforms[t].running) transforms[t].run();
         }
+
+        let scale = p.windowWidth / assets.images.table.w;
+
         assets.images.table.draw(0, 0, scale);
         assets.animations.candle_12.draw(34, 16, 1, 'candle1', scale, true);
         assets.animations.candle_12.draw(80, 10, 1.5, 'candle2', scale, true);
         assets.animations.candle_12.draw(280, 90, 1.25, 'candle3', scale, true);
         assets.animations.candle_12.draw(210, 70, 1.1, 'candle4', scale, true);
 
-        scenes[scene](scale, center);
+        mainMenu.play.draw(transforms.play.cur, 5, scale);
+        mainMenu.login.draw(transforms.login.cur, 50, scale);
+        mainMenu.register.draw(transforms.register.cur, 95, scale);
+
+        loginMenu.username.draw(transforms.username.cur, 5, scale);
+        loginMenu.password.draw(transforms.password.cur, 50, scale);
+        loginMenu.login.draw(transforms.login2.cur, 95, scale);
+
     };
 
-    function menuScene(scale, center) {
-        mainMenu.play.draw(center.x - mainMenu.play.w / 2, 5, scale);
-        mainMenu.login.draw(center.x - mainMenu.login.w / 2, 50, scale);
-        mainMenu.register.draw(center.x - mainMenu.login.w / 2, 95, scale);
-    }
-
-    function loginScene(scale, center) {
-        
-    }
-    function registerScene(scale, center) {
-
-    }
 
     p.windowResized = function () {
         p.resizeCanvas(p.windowWidth, p.windowHeight);
+        center = {
+            x: assets.images.table.w / 2,
+            y: p.windowHeight / 2
+        };
     }
     p.mouseReleased = function () {
         newClick = true;
@@ -219,6 +255,10 @@ class ButtonClass {
     draw(x, y, scale = 1) {
         if (this.image) this.image.draw(x, y, scale);
 
+        for (let t in transforms) {
+            if (transforms[t].running) transforms[t].update
+        }
+
         this.c.fill(255, 255, 255);
         this.c.noStroke();
         this.c.textFont(font, 8 * scale);
@@ -242,13 +282,14 @@ class InputClass {
         this.w = this.image.w;
         this.h = this.image.h;
         this.limit = limit;
-        this.regex = regex;
         this.c = context;
         this.id = `${type}_${Math.floor(Math.round() * 10000)}`;
 
         this.input = document.createElement('input');
         this.input.maxLength = this.limit;
         this.input.className = 'hiddeninput';
+        this.input.pattern = `${regex}`;
+
         document.getElementById('inputs').appendChild(this.input);
 
     }
@@ -266,10 +307,16 @@ class InputClass {
         this.c.textAlign(this.c.LEFT, this.c.CENTER);
         let startIndex = 0;
         let value = this.input.value;
+
+        if (this.type == 'password') {
+            value = '';
+            for (let i = 0; i < this.input.value.length; i++) value += '?';
+        }
+
         while (this.c.textWidth(value.substring(startIndex, value.length)) > (this.w - 8) * scale) {
             startIndex++;
         }
-        this.c.text(`${this.input.value.substring(startIndex, this.input.value.length)}`, (x + 6) * scale, (y + this.h / 2 + 2) * scale);
+        this.c.text(`${value.substring(startIndex, this.input.value.length)}`, (x + 6) * scale, (y + this.h / 2 + 2) * scale);
     }
     hover(x, y, scale) {
         let horizontal = this.c.mouseX > x * scale && this.c.mouseX < x * scale + this.w * scale;
@@ -277,6 +324,56 @@ class InputClass {
         return horizontal && vertical;
     }
 }
+class Transform {
+    constructor(name, a, b, maxSpeed, acceleration, cbf, cbb) {
+        this.name = name;
+        this.a = a;
+        this.b = b;
+        this.cur = a;
+        this.maxSpeed = maxSpeed;
+        this.acceleration = acceleration;
+        this.cbf = cbf;
+        this.cbb = cbb;
+        this.running = false;
+        this.speed = 0;
+        transforms[this.name] = this;
+    }
+    run() {
+        if (this.speed < this.maxSpeed) this.speed += this.acceleration;
+
+        if (this.running == 'forward') {
+
+            for (let i = 0; i < this.speed; i++) {
+                this.cur += Math.sign(this.b - this.a);
+
+                if (this.cur == this.b) {
+                    this.running = false;
+                    return this.cbf();
+                }
+            }
+        } else {
+
+            for (let i = 0; i < this.speed; i++) {
+                this.cur += Math.sign(this.a - this.b);
+
+                if (this.cur == this.a) {
+                    this.running = false;
+                    return this.cbb();
+                }
+            }
+        }
+    }
+    start(reverse = false) {
+        if (reverse) {
+            this.cur = this.b;
+            this.running = 'reverse';
+        } else {
+            this.cur = this.a;
+            this.running = 'forward';
+        }
+    }
+}
+
 
 function click(action) {
     if (newClick) {
