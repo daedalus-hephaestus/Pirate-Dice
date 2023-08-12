@@ -34,7 +34,7 @@ export class Room {
         let space = this.limit - this.playerList.length; // the amount of space in the room
         // if the room is full
         if (space <= 0)
-            return user.socket.socket.emit('room-full');
+            return user.socket.emit('room-full');
         // if the game is already being played
         if (this.status !== 'waiting')
             return user.socket.emit('room-unjoinable');
