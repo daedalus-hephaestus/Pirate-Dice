@@ -15,6 +15,7 @@ let font; // stores the font
 let bannerText = '';
 let username;
 let room = '';
+let roomInfo = {};
 let loadCallBack = function () { };
 
 function sketch(p) {
@@ -80,6 +81,7 @@ function sketch(p) {
             // if the scene is login, move the username off the screen
             if (scene == 'login') transforms.username.start(true);
             if (scene == 'register') transforms.usernameR.start(true);
+            if (scene == 'dashboard') SOCKET.emit('leave-room');
         }, p);
         // the logout button
         mainMenu.logout = new ButtonClass('Logout', 'button1', () => {
@@ -153,6 +155,7 @@ function sketch(p) {
             // if the scene is login, transform in the username input
             if (scene == 'login') transforms.username.start();
             if (scene == 'register') transforms.usernameR.start();
+            if (scene == 'dashboard') transforms.back.start();
         }, () => {
         });
         new Transform('banner', -assets.images.banner.h, 1, 40, 4, () => {
@@ -237,12 +240,40 @@ function sketch(p) {
             mainMenu.register.draw(transforms.register.cur, 110, scale);
         } else if (scene == 'dashboard') // if the scene is the dashboard
             mainMenu.logout.draw(transforms.login.cur, 70, scale);
+
         mainMenu.back.draw(transforms.back.cur, 1, scale);
 
         p.textFont(font, 6 * scale);
-        p.textAlign(p.LEFT, p.TOP);
+        p.textAlign(p.RIGHT, p.TOP);
         p.fill(255, 255, 255);
-        p.text(`${room ? 'Room:': ''} ${room}`, 1 * scale, 1 * scale);
+
+        if (room) {
+            let leftSide = (center.x * 2 - 1) * scale; // the left side of the screen
+
+            // displays the room number
+            p.text(`${room ? 'Room:' : ''} ${room}`, leftSide, 1 * scale);
+
+            p.textSize(4 * scale); // shrinks the text side
+
+            let owner = roomInfo.owner; // saves the room owner
+            // sets the ownership label
+            let label = `owner: ${owner}${owner == username ? '  (you)' : ''}`;
+            p.text(label, leftSide, 10 * scale); // displays the room owner
+
+            // if the game is waiting to start
+            if (roomInfo.status == 'waiting') {
+                p.fill(0, 0, 0, 200);
+                p.rect(2 * scale, 28 * scale, 45 * scale, (roomInfo.players.length * 6 + 13) * scale);
+
+                p.fill(255, 255, 255);
+                p.textAlign(p.LEFT, p.TOP);
+                p.text('Players\n--------------------', 4 * scale, 30 * scale)
+                for (let i = 0; i < roomInfo.players.length; i++) {
+                    let player = roomInfo.players[i];
+                    p.text(player.username, 4 * scale, (i * 6 + 40) * scale);
+                }
+            }
+        }
 
         // the login menu buttons (initially off screen)
         loginMenu.username.draw(transforms.username.cur, 1, scale);
@@ -257,7 +288,10 @@ function sketch(p) {
         registerMenu.register.draw(transforms.registerR.cur, 117, scale);
 
         // Draws the banner
-        assets.images.banner.draw(center.x - assets.images.banner.w / 2, transforms.banner.cur, scale);
+        let bannerX = center.x - assets.images.banner.w / 2;
+        let bannerY = transforms.banner.cur;
+        assets.images.banner.draw(bannerX, bannerY, scale);
+
         p.fill(255, 255, 255);
         p.noStroke();
         p.textFont(font, 6 * scale);
@@ -303,7 +337,7 @@ function alert(message) {
     transforms.banner.start();
 };
 function click(action) {
-    if (newClick) {
+    if (newClick && !bannerText) {
         action();
         newClick = false;
     }
@@ -530,9 +564,14 @@ SOCKET.on('delete-cookie', () => {
         'auth_cookie=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
 });
 SOCKET.on('room-update', (data) => {
+    roomInfo = data;
+    console.log(data);
 });
-SOCKET.on('room-closed', () => {
-    alert('room has been closed by the owner');
+SOCKET.on('room-closed', (data) => {
+    room = '';
+    roomInfo = {};
+    transforms.back.start(true);
+    alert(`You have left room ${data}`);
 });
 SOCKET.on('room-unjoinable', () => {
     alert('game already in progress');

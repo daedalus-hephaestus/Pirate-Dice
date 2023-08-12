@@ -48,7 +48,7 @@ name, password, socket) {
             let session = new SessionModel({
                 // creates a new session
                 cookie: key,
-                username: name,
+                username: name
             });
             yield session.save(); // saves the session
             socket.emit('auth-cookie', key); // sends the key to the client
@@ -74,7 +74,7 @@ username, password, email, socket) {
             username: username,
             username_case: username.toLowerCase(),
             email: email,
-            password: hash,
+            password: hash
         });
         yield user.save(); // saves the user
         return socket.emit('user-created', username);
@@ -91,7 +91,7 @@ export function guestLogin(socket) {
         let session = new SessionModel({
             // creates a new session
             cookie: key,
-            username: guestName,
+            username: guestName
         });
         yield session.save(); // saves the session
         socket.emit('auth-cookie', key); // sends the key to the client
@@ -125,8 +125,16 @@ function login(username, username_case, cookie, socket) {
     socket.authCookie = cookie;
     console.log(`socket ${socket.id} has been assigned to user ${username}`);
     socket.emit('correct', username);
+    socket.on('leave-room', () => {
+        if (SOCKETS[socket.id].room) {
+            let room = SOCKETS[socket.id].room;
+            ROOMS[room].leave(socket.id);
+        }
+    });
     socket.on('disconnect', () => {
         console.log(`socket ${socket.id} has been disconnected`);
+        if (SOCKETS[socket.id] == undefined)
+            return;
         if (SOCKETS[socket.id].room) {
             let room = SOCKETS[socket.id].room;
             ROOMS[room].leave(socket.id);

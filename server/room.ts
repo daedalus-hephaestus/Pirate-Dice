@@ -45,7 +45,7 @@ export class Room {
 		let space = this.limit - this.playerList.length; // the amount of space in the room
 
 		// if the room is full
-		if (space <= 0) return user.socket.socket.emit('room-full');
+		if (space <= 0) return user.socket.emit('room-full');
 		// if the game is already being played
 		if (this.status !== 'waiting') return user.socket.emit('room-unjoinable');
 		// if that username is already in the room
@@ -294,12 +294,12 @@ export class Room {
 			// loops through the player ids
 			for (let id in this.players) {
 				console.log(`${SOCKETS[id].username} has been kicked from ${this.id}`);
-				SOCKETS[id].socket.emit('room-closed');
+				SOCKETS[id].socket.emit('room-closed', this.id);
 				delete SOCKETS[id].room; // deletes the room from each player's socket
 			}
 			delete ROOMS[this.id]; // deletes the room
 		} else {
-			SOCKETS[socketID].socket.emit('room-closed');
+			SOCKETS[socketID].socket.emit('room-closed', this.id);
 			delete this.players[socketID]; // deletes the player from the room
 			delete SOCKETS[socketID].room; // deletes the room from their socket
 			this.update();

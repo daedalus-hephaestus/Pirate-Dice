@@ -43,7 +43,7 @@ export async function loginCheck( // takes the username and password and logs in
 		let session = new SessionModel({
 			// creates a new session
 			cookie: key,
-			username: name,
+			username: name
 		});
 		await session.save(); // saves the session
 		socket.emit('auth-cookie', key); // sends the key to the client
@@ -72,7 +72,7 @@ export async function createUser( // creates a new user
 		username: username,
 		username_case: username.toLowerCase(), // lowercase username
 		email: email,
-		password: hash,
+		password: hash
 	});
 
 	await user.save(); // saves the user
@@ -89,7 +89,7 @@ export async function guestLogin(socket: Socket) {
 	let session = new SessionModel({
 		// creates a new session
 		cookie: key,
-		username: guestName,
+		username: guestName
 	});
 	await session.save(); // saves the session
 	socket.emit('auth-cookie', key); // sends the key to the client
@@ -125,6 +125,12 @@ function login(
 
 	socket.emit('correct', username);
 
+	socket.on('leave-room', () => {
+		if (SOCKETS[socket.id].room) {
+			let room = SOCKETS[socket.id].room;
+			ROOMS[room].leave(socket.id);
+		}
+	});
 	socket.on('disconnect', () => {
 		console.log(`socket ${socket.id} has been disconnected`);
 		if (SOCKETS[socket.id] == undefined) return;
@@ -136,7 +142,6 @@ function login(
 	});
 
 	SOCKETS[socket.id] = { username: username, socket };
-
 }
 
 function guestId(length) {
