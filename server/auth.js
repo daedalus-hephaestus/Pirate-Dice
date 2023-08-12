@@ -121,7 +121,6 @@ export function logoutUser(socket) {
     });
 }
 function login(username, username_case, cookie, socket) {
-    SOCKETS[socket.id] = { username: username, socket };
     socket.username = username_case;
     socket.authCookie = cookie;
     console.log(`socket ${socket.id} has been assigned to user ${username}`);
@@ -134,6 +133,7 @@ function login(username, username_case, cookie, socket) {
         }
         delete SOCKETS[socket.id];
     });
+    SOCKETS[socket.id] = { username: username, socket };
 }
 function guestId(length) {
     let result = '';

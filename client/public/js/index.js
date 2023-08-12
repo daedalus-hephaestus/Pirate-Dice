@@ -13,6 +13,9 @@ let newClick = true; // whether or not the current click is a new click
 let scene = 'menu'; // the current scene
 let font; // stores the font
 let bannerText = '';
+let username;
+let room = '';
+let loadCallBack = function () { };
 
 function sketch(p) {
     let center; // stores the center point of the canvas
@@ -48,12 +51,20 @@ function sketch(p) {
             y: p.windowHeight / 2
         };
 
+        // saves some widths to cut down on repetition
+        let b1Width = assets.images.button1.w;
+        let b2Width = assets.images.button2.w;
+        let iWidth = assets.images.input.w;
+
         // the main menu play button
         mainMenu.play = new ButtonClass('Play', 'button1', () => {
-            //SOCKET.emit('play');
-            scene = 'game'; // sets scene to game
-            transforms.play.start(); // starts the transition
+            SOCKET.emit('play', {
+                username: username,
+                room: mainMenu.room.value()
+            });
         }, p);
+        // the room code input
+        mainMenu.room = new InputClass('text', 'room code', 'input', 5, p);
         // the main menu login button
         mainMenu.login = new ButtonClass('Login', 'button1', () => {
             scene = 'login'; // set scene to login
@@ -70,6 +81,11 @@ function sketch(p) {
             if (scene == 'login') transforms.username.start(true);
             if (scene == 'register') transforms.usernameR.start(true);
         }, p);
+        // the logout button
+        mainMenu.logout = new ButtonClass('Logout', 'button1', () => {
+            SOCKET.emit('logout');
+            window.location.reload();
+        }, p);
 
         // the login menu username input
         loginMenu.username = new InputClass('text', 'username', 'input', 20, p);
@@ -77,7 +93,12 @@ function sketch(p) {
         loginMenu.password = new InputClass('password', 'password', 'input', 24, p)
         // the login menu login button
         loginMenu.login = new ButtonClass('Login', 'button1', () => {
-            // LOGIN SOCKET HERE
+            if (loginMenu.username == '') return alert('Please enter a username');
+            if (loginMenu.password == '') return alert('Please enter a password');
+            SOCKET.emit('login', {
+                username: loginMenu.username.value(),
+                password: loginMenu.password.value()
+            });
         }, p);
 
         // the register menu username input
@@ -112,78 +133,85 @@ function sketch(p) {
 
 
         // MAIN MENU TRANSFORMS
-        new Transform('play', center.x - assets.images.button1.w / 2, -assets.images.button1.w, 40, 4, () => {
-            transforms.login.start(); // starts moving the login button off
+        new Transform('play', center.x - b1Width / 2, -b1Width, 40, 4, () => {
+            transforms.room.start(); // starts moving the login button off
         }, () => {
-            transforms.login.start(true); // starts moving the login button on
+            transforms.room.start(true); // starts moving the login button on
+        });
+        new Transform('room', center.x - iWidth / 2, center.x * 2, 40, 4, () => {
+            transforms.login.start();
+        }, () => {
+            transforms.login.start(true);
         });
         // the main menu login button transform
-        new Transform('login', center.x - assets.images.button1.w / 2, center.x * 2, 40, 4, () => {
+        new Transform('login', center.x - b1Width / 2, -b1Width, 40, 4, () => {
             transforms.register.start(); // starts moving the register button off
         }, () => {
             transforms.register.start(true); // starts moving the register button on
         });
-        new Transform('register', center.x - assets.images.button1.w / 2, -assets.images.button1.w, 40, 4, () => {
+        new Transform('register', center.x - b1Width / 2, center.x * 2, 40, 4, () => {
             // if the scene is login, transform in the username input
             if (scene == 'login') transforms.username.start();
             if (scene == 'register') transforms.usernameR.start();
         }, () => {
-            scene = 'menu';
         });
         new Transform('banner', -assets.images.banner.h, 1, 40, 4, () => {
 
         }, () => {
             bannerText = '';
         });
+        new Transform('back', -b2Width, 1, 40, 4, () => { }, () => {
+            if (scene != 'dashboard') scene = 'menu';
+            transforms.play.start(true);
+        });
 
         // LOGIN MENU TRANSFORMS
-        new Transform('username', -assets.images.input.w, center.x - assets.images.input.w / 2, 40, 4, () => {
+        new Transform('username', -iWidth, center.x - iWidth / 2, 40, 4, () => {
             transforms.password.start();
         }, () => {
             transforms.password.start(true);
         });
-        new Transform('password', center.x * 2, center.x - assets.images.input.w / 2, 40, 4, () => {
+        new Transform('password', center.x * 2, center.x - iWidth / 2, 40, 4, () => {
             transforms.login2.start();
         }, () => {
             transforms.login2.start(true);
         });
-        new Transform('login2', -assets.images.button1.w, center.x - assets.images.button1.w / 2, 40, 4, () => {
+        new Transform('login2', -b1Width, center.x - b1Width / 2, 40, 4, () => {
             transforms.back.start();
         }, () => {
             transforms.back.start(true);
         });
-        new Transform('back', -assets.images.button2.w, 1, 40, 4, () => { }, () => {
-            scene = 'menu'
-            transforms.play.start(true);
-        });
+
 
         // REGISTER MENU TRANSFORMS
-        new Transform('usernameR', -assets.images.input.w, center.x - assets.images.input.w / 2, 40, 4, () => {
+        new Transform('usernameR', -iWidth, center.x - iWidth / 2, 40, 4, () => {
             transforms.email.start();
         }, () => {
             transforms.email.start(true);
         });
-        new Transform('email', center.x * 2, center.x - assets.images.input.w / 2, 40, 4, () => {
+        new Transform('email', center.x * 2, center.x - iWidth / 2, 40, 4, () => {
             transforms.password1.start();
         }, () => {
             transforms.password1.start(true);
         });
-        new Transform('password1', -assets.images.input.w, center.x - assets.images.input.w / 2, 40, 4, () => {
+        new Transform('password1', -iWidth, center.x - iWidth / 2, 40, 4, () => {
             transforms.password2.start();
         }, () => {
             transforms.password2.start(true);
         });
-        new Transform('password2', center.x * 2, center.x - assets.images.input.w / 2, 40, 4, () => {
+        new Transform('password2', center.x * 2, center.x - iWidth / 2, 40, 4, () => {
             transforms.registerR.start();
         }, () => {
             transforms.registerR.start(true);
         });
-        new Transform('registerR', -assets.images.button1.w, center.x - assets.images.button1.w / 2, 40, 4, () => {
+
+        new Transform('registerR', -b1Width, center.x - b1Width / 2, 40, 4, () => {
             transforms.back.start();
         }, () => {
             transforms.back.start(true);
         });
 
+        loadCallBack();
     };
     p.draw = function () {
         p.background(0, 0, 0);
@@ -195,29 +223,40 @@ function sketch(p) {
 
         let scale = p.windowWidth / assets.images.table.w;
 
-
         assets.images.table.draw(0, 0, scale);
-
         assets.animations.candle_12.draw(34, 16, 1, 'candle1', scale, true);
         assets.animations.candle_12.draw(80, 10, 1.5, 'candle2', scale, true);
         assets.animations.candle_12.draw(280, 90, 1.25, 'candle3', scale, true);
         assets.animations.candle_12.draw(210, 70, 1.1, 'candle4', scale, true);
 
-        mainMenu.play.draw(transforms.play.cur, 5, scale);
-        mainMenu.login.draw(transforms.login.cur, 50, scale);
-        mainMenu.register.draw(transforms.register.cur, 95, scale);
+        // draws the menu buttons
+        mainMenu.play.draw(transforms.play.cur, 1, scale);
+        mainMenu.room.draw(transforms.room.cur, 41, scale);
+        if (scene != 'dashboard') { // if the scene is not the dashboard
+            mainMenu.login.draw(transforms.login.cur, 70, scale);
+            mainMenu.register.draw(transforms.register.cur, 110, scale);
+        } else if (scene == 'dashboard') // if the scene is the dashboard
+            mainMenu.logout.draw(transforms.login.cur, 70, scale);
         mainMenu.back.draw(transforms.back.cur, 1, scale);
 
+        p.textFont(font, 6 * scale);
+        p.textAlign(p.LEFT, p.TOP);
+        p.fill(255, 255, 255);
+        p.text(`${room ? 'Room:': ''} ${room}`, 1 * scale, 1 * scale);
+
+        // the login menu buttons (initially off screen)
         loginMenu.username.draw(transforms.username.cur, 1, scale);
         loginMenu.password.draw(transforms.password.cur, 30, scale);
         loginMenu.login.draw(transforms.login2.cur, 59, scale);
 
+        // the register menu buttons (initially off screen)
         registerMenu.username.draw(transforms.usernameR.cur, 1, scale);
         registerMenu.email.draw(transforms.email.cur, 30, scale);
         registerMenu.password1.draw(transforms.password1.cur, 59, scale)
         registerMenu.password2.draw(transforms.password2.cur, 88, scale);
         registerMenu.register.draw(transforms.registerR.cur, 117, scale);
 
+        // Draws the banner
         assets.images.banner.draw(center.x - assets.images.banner.w / 2, transforms.banner.cur, scale);
         p.fill(255, 255, 255);
         p.noStroke();
@@ -226,7 +265,7 @@ function sketch(p) {
         p.text(
             bannerText,
             center.x * scale,
-            (transforms.banner.cur + assets.images.banner.h / 2)* scale,
+            (transforms.banner.cur + assets.images.banner.h / 2) * scale,
         );
 
     };
@@ -471,7 +510,11 @@ SOCKET.on('assets', (data) => {
 SOCKET.on('unavailable', (data) => {
     alert(`That ${data} is unavailable`);
 });
-SOCKET.on('correct', (username) => {
+SOCKET.on('correct', (data) => {
+    username = data;
+    console.log(username);
+    if (scene == 'login') transforms.username.start(true);
+    scene = 'dashboard';
 });
 SOCKET.on('incorrect', () => {
     alert('username or password incorrect');
@@ -504,11 +547,15 @@ SOCKET.on('room-not-found', () => {
     alert('room not found');
 });
 SOCKET.on('logout', () => {
-    window.location.reload();
+    //window.location.reload();
 });
 SOCKET.on('owner', (data) => {
+    room = data;
+    transforms.play.start(); // starts the transition
 });
 SOCKET.on('room-joined', (data) => {
+    room = data;
+    transforms.play.start(); // starts the transition
 });
 SOCKET.on('your-roll', (data) => {
 });

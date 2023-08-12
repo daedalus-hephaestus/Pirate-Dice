@@ -119,19 +119,24 @@ function login(
 	cookie: string,
 	socket: Socket
 ) {
-	SOCKETS[socket.id] = { username: username, socket };
 	socket.username = username_case;
 	socket.authCookie = cookie;
-	console.log(`socket ${socket.id} has been assigned to user ${username}`)
+	console.log(`socket ${socket.id} has been assigned to user ${username}`);
+
 	socket.emit('correct', username);
+
 	socket.on('disconnect', () => {
 		console.log(`socket ${socket.id} has been disconnected`);
+		if (SOCKETS[socket.id] == undefined) return;
 		if (SOCKETS[socket.id].room) {
 			let room = SOCKETS[socket.id].room;
 			ROOMS[room].leave(socket.id);
 		}
 		delete SOCKETS[socket.id];
 	});
+
+	SOCKETS[socket.id] = { username: username, socket };
+
 }
 
 function guestId(length) {

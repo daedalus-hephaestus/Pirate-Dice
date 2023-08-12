@@ -35,8 +35,7 @@ const sessionSchema = new Schema({
 	expireAt: {
 
         type: Date,
-		default: Date.now(),
-        expires: 7 * 24 * 60 * 60 // stay logged in for seven days
+        expires: 604800, // stay logged in for seven days
 
     },
 });
