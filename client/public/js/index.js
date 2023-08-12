@@ -445,7 +445,7 @@ class InputClass {
         if (this.image) this.image.draw(x, y, scale);
         if (this.hover(x, y, scale) && this.c.mouseIsPressed) {
             click(() => {
-                setTimeout(() => { this.input.focus({ preventScroll: true }) }, 200);
+                setTimeout(() => { this.input.focus({ preventScroll: true }) }, 500);
             });
         }
 
