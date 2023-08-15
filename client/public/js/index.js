@@ -330,7 +330,7 @@ function sketch(p) {
         };
     };
     p.mouseReleased = function () {
-        setTimeout(() => { newClick = true }, 1000);
+        newClick = true;
     }
 }
 
@@ -471,7 +471,7 @@ class InputClass {
         if (this.image) this.image.draw(x, y, scale);
         if (this.hover(x, y, scale, this.c.touches) && this.c.mouseIsPressed) {
             click(() => {
-                this.input.focus({ preventScroll: true });
+                setTimeout(() => { this.input.focus({ preventScroll: true }) }, 500);
             });
         }
 
