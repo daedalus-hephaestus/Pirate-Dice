@@ -469,9 +469,9 @@ class InputClass {
     }
     draw(x, y, scale = 1) {
         if (this.image) this.image.draw(x, y, scale);
-        if (this.hover(x, y, scale) && this.c.mouseIsPressed) {
+        if (this.hover(x, y, scale, this.c.touches) && this.c.mouseIsPressed) {
             click(() => {
-                setTimeout(() => { this.input.focus({ preventScroll: true }) }, 500);
+                this.input.focus({ preventScroll: true });
             });
         }
 
@@ -497,9 +497,18 @@ class InputClass {
         }
         this.c.text(`${value.substring(startIndex, this.input.value.length)}`, (x + 6) * scale, (y + this.h / 2 + 2) * scale);
     }
-    hover(x, y, scale) {
-        let horizontal = this.c.mouseX > x * scale && this.c.mouseX < x * scale + this.w * scale;
-        let vertical = this.c.mouseY > y * scale && this.c.mouseY < (y + this.h) * scale;
+    hover(x, y, scale, touch = false) {
+        let cursor = {
+            x: this.c.mouseX,
+            y: this.c.mouseY
+        };
+        if (touch.length > 0) {
+            cursor.x = touch[0].x;
+            cursor.y = touch[0].y;
+        }
+
+        let horizontal = cursor.x > x * scale && cursor.x < x * scale + this.w * scale;
+        let vertical = cursor.y > y * scale && cursor.y < (y + this.h) * scale;
         return horizontal && vertical;
     }
     value() {
