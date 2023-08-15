@@ -330,7 +330,7 @@ function sketch(p) {
         };
     };
     p.mouseReleased = function () {
-        setTimeout(() => {newClick = true}, 500);
+        setTimeout(() => {newClick = true}, 1000);
     }
 }
 
