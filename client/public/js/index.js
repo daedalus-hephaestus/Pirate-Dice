@@ -324,10 +324,13 @@ function sketch(p) {
         };
     }
     p.mousePressed = function () {
-        if (newClick && bannerText) transforms.banner.start(true);
+        if (newClick && bannerText) {
+            newClick = false;
+            transforms.banner.start(true);
+        };
     };
     p.mouseReleased = function () {
-        newClick = true;
+        setTimeout(() => {newClick = true}, 500);
     }
 }
 
@@ -350,9 +353,10 @@ function alert(message) {
     transforms.banner.start();
 };
 function click(action) {
+    console.log(bannerText);
     if (newClick && !bannerText) {
+        newClick = false;
         action();
-        setTimeout(() => newClick = false, 500);
     }
 }
 
