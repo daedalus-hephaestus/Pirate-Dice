@@ -431,18 +431,22 @@ class ButtonClass {
         this.c.textFont(font, 8 * scale);
         this.c.textAlign(this.c.CENTER, this.c.CENTER);
         this.c.text(this.text, (x + this.w / 2) * scale, (y + this.h / 2) * scale);
-        if (this.c.touches.length > 0) {
-            if (this.hover(this.c.touches[0].x, this.c.touches[0].y, scale)) {
-                console.log(true);
-                click(this.action);
-            }
-        } else if (this.hover(x, y, scale) && this.c.mouseIsPressed) {
+        if (this.hover(x, y, scale, this.c.touches) && this.c.mouseIsPressed) {
             click(this.action);
         }
     }
-    hover(x, y, scale) {
-        let horizontal = this.c.mouseX > x * scale && this.c.mouseX < x * scale + this.w * scale;
-        let vertical = this.c.mouseY > y * scale && this.c.mouseY < (y + this.h) * scale;
+    hover(x, y, scale, touch = false) {
+        let cursor = {
+            x: this.c.mouseX,
+            y: this.c.mouseY
+        };
+        if (touch.length > 0) {
+            cursor.x = touch[0].x;
+            cursor.y = touch[0].y;
+        }
+
+        let horizontal = cursor.x > x * scale && cursor.x < x * scale + this.w * scale;
+        let vertical = cursor.y > y * scale && cursor.y < (y + this.h) * scale;
         return horizontal && vertical;
     }
 }
