@@ -220,7 +220,7 @@ function sketch(p) {
         });
 
         // GAME MENU TRANSFORMS
-        new Transform('scroll', -sWidth, 0, 40, 4, () => {}, () => {
+        new Transform('scroll', -sWidth, 0, 40, 4, () => { }, () => {
             transforms.back.start(true);
         });
 
@@ -330,7 +330,7 @@ function sketch(p) {
         };
     };
     p.mouseReleased = function () {
-        setTimeout(() => {newClick = true}, 1000);
+        setTimeout(() => { newClick = true }, 1000);
     }
 }
 
@@ -432,8 +432,10 @@ class ButtonClass {
         this.c.textAlign(this.c.CENTER, this.c.CENTER);
         this.c.text(this.text, (x + this.w / 2) * scale, (y + this.h / 2) * scale);
         if (this.c.touches.length > 0) {
-            if (this.hover(this.c.touches[0].x, this.c.touches[0].y, scale))
+            if (this.hover(this.c.touches[0].x, this.c.touches[0].y, scale)) {
+                console.log(true);
                 click(this.action);
+            }
         } else if (this.hover(x, y, scale) && this.c.mouseIsPressed) {
             click(this.action);
         }
