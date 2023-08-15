@@ -431,7 +431,9 @@ class ButtonClass {
         this.c.textFont(font, 8 * scale);
         this.c.textAlign(this.c.CENTER, this.c.CENTER);
         this.c.text(this.text, (x + this.w / 2) * scale, (y + this.h / 2) * scale);
-        if (this.hover(x, y, scale) && this.c.mouseIsPressed) {
+        if (this.c.touches) {
+            alert(this.c.touches);
+        } else if (this.hover(x, y, scale) && this.c.mouseIsPressed) {
             click(this.action);
         }
     }
