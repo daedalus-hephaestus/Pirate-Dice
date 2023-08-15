@@ -56,6 +56,7 @@ function sketch(p) {
         let b1Width = assets.images.button1.w;
         let b2Width = assets.images.button2.w;
         let iWidth = assets.images.input.w;
+        let sWidth = assets.images.scroll.w;
 
         // the main menu play button
         mainMenu.play = new ButtonClass('Play', 'button1', () => {
@@ -87,6 +88,9 @@ function sketch(p) {
         mainMenu.logout = new ButtonClass('Logout', 'button1', () => {
             SOCKET.emit('logout');
             window.location.reload();
+        }, p);
+        mainMenu.start = new ButtonClass('Start', 'button2', () => {
+            SOCKET.emit('start-game');
         }, p);
 
         // the login menu username input
@@ -163,7 +167,9 @@ function sketch(p) {
         }, () => {
             bannerText = '';
         });
-        new Transform('back', -b2Width, 1, 40, 4, () => { }, () => {
+        new Transform('back', -b2Width, 1, 40, 4, () => {
+            if (scene == 'dashboard') transforms.scroll.start();
+        }, () => {
             if (scene != 'dashboard') scene = 'menu';
             transforms.play.start(true);
         });
@@ -207,10 +213,14 @@ function sketch(p) {
         }, () => {
             transforms.registerR.start(true);
         });
-
         new Transform('registerR', -b1Width, center.x - b1Width / 2, 40, 4, () => {
             transforms.back.start();
         }, () => {
+            transforms.back.start(true);
+        });
+
+        // GAME MENU TRANSFORMS
+        new Transform('scroll', -sWidth, 0, 40, 4, () => {}, () => {
             transforms.back.start(true);
         });
 
@@ -262,15 +272,18 @@ function sketch(p) {
 
             // if the game is waiting to start
             if (roomInfo.status == 'waiting') {
-                p.fill(0, 0, 0, 200);
-                p.rect(2 * scale, 28 * scale, 45 * scale, (roomInfo.players.length * 6 + 13) * scale);
+                assets.images.scroll.draw(transforms.scroll.cur, 24, scale);
 
-                p.fill(255, 255, 255);
+                p.fill("#541d29");
                 p.textAlign(p.LEFT, p.TOP);
-                p.text('Players\n--------------------', 4 * scale, 30 * scale)
+                p.text('Players\n--------------------', (transforms.scroll.cur + 4) * scale, 36 * scale)
                 for (let i = 0; i < roomInfo.players.length; i++) {
                     let player = roomInfo.players[i];
-                    p.text(player.username, 4 * scale, (i * 6 + 40) * scale);
+                    p.text(player.username, (transforms.scroll.cur + 4) * scale, (i * 6 + 46) * scale);
+                }
+
+                if (roomInfo.owner == username) {
+                    mainMenu.start.draw(transforms.scroll.cur + 1, 106, scale);
                 }
             }
         }
@@ -570,7 +583,7 @@ SOCKET.on('room-update', (data) => {
 SOCKET.on('room-closed', (data) => {
     room = '';
     roomInfo = {};
-    transforms.back.start(true);
+    transforms.scroll.start(true);
     alert(`You have left room ${data}`);
 });
 SOCKET.on('room-unjoinable', () => {
@@ -582,6 +595,9 @@ SOCKET.on('room-full', () => {
 SOCKET.on('in-room', () => {
     alert('you are already in this room');
 });
+SOCKET.on('more-players', () => {
+    alert('You need more players');
+})
 SOCKET.on('room-not-found', () => {
     alert('room not found');
 });

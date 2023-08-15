@@ -24,7 +24,7 @@ export class Room {
 			if (this.playerList.length > 1) {
 				this.status = 'roll'; // sets the game state to roll
 				this.update(); // runs the update function
-			}
+			} else ownerData.socket.emit('more-players');
 		});
 
 		this.ownerSocketID = ownerSocketID; // saves the owners socket

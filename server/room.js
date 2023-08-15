@@ -18,6 +18,8 @@ export class Room {
                 this.status = 'roll'; // sets the game state to roll
                 this.update(); // runs the update function
             }
+            else
+                ownerData.socket.emit('more-players');
         });
         this.ownerSocketID = ownerSocketID; // saves the owners socket
         this.limit = limit; // the amount of people who can join the game
