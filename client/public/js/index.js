@@ -352,7 +352,7 @@ function alert(message) {
 function click(action) {
     if (newClick && !bannerText) {
         action();
-        newClick = false;
+        setTimeout(() => newClick = false, 500);
     }
 }
 
