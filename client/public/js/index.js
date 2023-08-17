@@ -16,7 +16,13 @@ let bannerText = '';
 let username;
 let room = '';
 let roomInfo = {};
-let loadCallBack = function () { };
+let dicePositions = [
+    [[144, 120], [153, 123], [141, 128], [158, 131], [149, 134]],
+    [[140, 123], [133, 128], [153, 122], [147, 127], [156, 132]],
+    [[133, 120], [144, 118], [140, 126], [154, 123], [148, 129]],
+];
+let dice = false;
+let rolling = false;
 
 function sketch(p) {
     let center; // stores the center point of the canvas
@@ -49,7 +55,7 @@ function sketch(p) {
         // updates the center point on the canvas
         center = {
             x: assets.images.table.w / 2,
-            y: p.windowHeight / 2
+            y: assets.images.table.h / 2
         };
 
         // saves some widths to cut down on repetition
@@ -91,6 +97,10 @@ function sketch(p) {
         }, p);
         mainMenu.start = new ButtonClass('Start', 'button2', () => {
             SOCKET.emit('start-game');
+        }, p);
+        mainMenu.roll = new ButtonClass('Roll', 'button2', () => {
+            SOCKET.emit('roll');
+            rolling = 'place';
         }, p);
 
         // the login menu username input
@@ -224,7 +234,6 @@ function sketch(p) {
             transforms.back.start(true);
         });
 
-        loadCallBack();
     };
     p.draw = function () {
         p.background(0, 0, 0);
@@ -235,6 +244,8 @@ function sketch(p) {
         }
 
         let scale = p.windowWidth / assets.images.table.w;
+
+
 
         assets.images.table.draw(0, 0, scale);
         assets.animations.candle_12.draw(34, 16, 1, 'candle1', scale, true);
@@ -286,6 +297,14 @@ function sketch(p) {
                     mainMenu.start.draw(transforms.scroll.cur + 1, 106, scale);
                 }
             }
+            if (roomInfo.status == 'roll') {
+                mainMenu.roll.draw(center.x - assets.images.button2.w / 2, center.y * 2 - assets.images.button2.h, scale);
+                if (rolling == 'place') {
+                    assets.animations.place_13.draw(0, 0, 2, 'place', scale, false, false);
+                    if (assets.animations.place_13.finished('place')) rolling = 'peek';
+                }
+                if (rolling == 'peek') {}
+            }
         }
 
         // the login menu buttons (initially off screen)
@@ -315,6 +334,14 @@ function sketch(p) {
             (transforms.banner.cur + assets.images.banner.h / 2) * scale,
         );
 
+        /*if (p.mouseIsPressed && newClick) {
+            console.log(`${p.mouseX / scale}, ${p.mouseY / scale}`);
+            newClick = false;
+        }*/
+        if (dice) dice.draw(scale);
+
+        p.textSize(8 * scale);
+        //p.text(`${Math.round(p.mouseX / scale)}, ${Math.round(p.mouseY / scale)}`, p.mouseX + 10 * scale, p.mouseY + 10 * scale)
     };
     p.windowResized = function () {
         p.resizeCanvas(p.windowWidth, p.windowHeight);
@@ -353,7 +380,6 @@ function alert(message) {
     transforms.banner.start();
 };
 function click(action) {
-    console.log(bannerText);
     if (newClick && !bannerText) {
         newClick = false;
         action();
@@ -379,7 +405,7 @@ class AnimationClass {
             this.frames.push(this.image.get(i * this.fw, 0, this.fw, this.fh));
         }
     }
-    draw(x, y, speed, id, scale = 1, random = false) {
+    draw(x, y, speed, id, scale = 1, random = false, loop = true) {
         if (!this.instances[id]) {
             random
                 ? this.instances[id] = Math.random() * this.frameCount
@@ -387,10 +413,13 @@ class AnimationClass {
         }
         this.instances[id] += speed;
         if (Math.floor(this.instances[id] / 10) > this.frameCount - 1)
-            this.instances[id] = 0;
+            loop ? this.instances[id] = 0 : this.instances[id] = (this.frameCount - 1) * 10;
 
         let cur = this.frames[Math.floor(this.instances[id] / 10)];
         this.c.image(cur, x * scale, y * scale, this.fw * scale, this.fh * scale);
+    }
+    finished(id) {
+        return this.instances[id] == (this.frameCount - 1) * 10;
     }
 }
 class ImageClass {
@@ -564,6 +593,25 @@ class Transform {
         }
     }
 }
+class Dice {
+    constructor(diceList) {
+        this.pattern = Math.floor(Math.random() * dicePositions.length);
+        this.diceList = diceList;
+        this.diceModes = [];
+        this.diceList.forEach(() => this.diceModes.push(Math.round(Math.random())));
+        dice = this;
+    }
+    draw(scale) {
+        for (let d = 0; d < this.diceList.length; d++) {
+            let num = this.diceList[d];
+            let mode = this.diceModes[d] + 1;
+            let x = dicePositions[this.pattern][d][0];
+            let y = dicePositions[this.pattern][d][1];
+
+            assets.images[`dice_${num}_${mode}`].draw(x, y, scale);
+        }
+    }
+}
 
 SOCKET.on('assets', (data) => {
     let types = Object.keys(data);
@@ -635,6 +683,7 @@ SOCKET.on('room-joined', (data) => {
     transforms.play.start(); // starts the transition
 });
 SOCKET.on('your-roll', (data) => {
+    dice = new Dice(data);
 });
 SOCKET.on('small-bet', () => {
     alert('your bet is too small');
