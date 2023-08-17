@@ -17,9 +17,9 @@ let username;
 let room = '';
 let roomInfo = {};
 let dicePositions = [
-    [[144, 120], [153, 123], [141, 128], [158, 131], [149, 134]],
-    [[140, 123], [133, 128], [153, 122], [147, 127], [156, 132]],
-    [[133, 120], [144, 118], [140, 126], [154, 123], [148, 129]],
+    [[131, 105], [140, 108], [128, 113], [145, 116], [136, 119]],
+    [[127, 108], [120, 113], [140, 107], [134, 112], [143, 117]],
+    [[120, 105], [131, 103], [127, 111], [141, 108], [135, 114]],
 ];
 let dice = false;
 let rolling = false;
@@ -268,6 +268,7 @@ function sketch(p) {
         p.textAlign(p.RIGHT, p.TOP);
         p.fill(255, 255, 255);
 
+
         if (room) {
             let leftSide = (center.x * 2 - 1) * scale; // the left side of the screen
 
@@ -280,6 +281,8 @@ function sketch(p) {
             // sets the ownership label
             let label = `owner: ${owner}${owner == username ? '  (you)' : ''}`;
             p.text(label, leftSide, 10 * scale); // displays the room owner
+
+            if (dice && rolling !== 'place') dice.draw(scale);
 
             // if the game is waiting to start
             if (roomInfo.status == 'waiting') {
@@ -299,13 +302,15 @@ function sketch(p) {
             }
             if (roomInfo.status == 'roll') {
                 mainMenu.roll.draw(center.x - assets.images.button2.w / 2, center.y * 2 - assets.images.button2.h, scale);
-                
+
             }
             if (rolling == 'place') {
                 assets.animations.place_13.draw(0, 0, 2, 'place', scale, false, false);
                 if (assets.animations.place_13.finished('place')) rolling = 'peek';
             }
-            if (rolling == 'peek') {}
+            if (rolling == 'peek') {
+                assets.animations.peek_4.draw(0, 0, 2, 'peek', scale, false, false);
+            }
         }
 
         // the login menu buttons (initially off screen)
@@ -339,10 +344,9 @@ function sketch(p) {
             console.log(`${p.mouseX / scale}, ${p.mouseY / scale}`);
             newClick = false;
         }*/
-        if (dice) dice.draw(scale);
 
         p.textSize(8 * scale);
-        //p.text(`${Math.round(p.mouseX / scale)}, ${Math.round(p.mouseY / scale)}`, p.mouseX + 10 * scale, p.mouseY + 10 * scale)
+        p.text(`${Math.round(p.mouseX / scale)}, ${Math.round(p.mouseY / scale)}`, p.mouseX + 10 * scale, p.mouseY + 10 * scale)
     };
     p.windowResized = function () {
         p.resizeCanvas(p.windowWidth, p.windowHeight);
