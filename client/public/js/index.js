@@ -299,12 +299,13 @@ function sketch(p) {
             }
             if (roomInfo.status == 'roll') {
                 mainMenu.roll.draw(center.x - assets.images.button2.w / 2, center.y * 2 - assets.images.button2.h, scale);
-                if (rolling == 'place') {
-                    assets.animations.place_13.draw(0, 0, 2, 'place', scale, false, false);
-                    if (assets.animations.place_13.finished('place')) rolling = 'peek';
-                }
-                if (rolling == 'peek') {}
+                
             }
+            if (rolling == 'place') {
+                assets.animations.place_13.draw(0, 0, 2, 'place', scale, false, false);
+                if (assets.animations.place_13.finished('place')) rolling = 'peek';
+            }
+            if (rolling == 'peek') {}
         }
 
         // the login menu buttons (initially off screen)
