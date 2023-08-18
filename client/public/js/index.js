@@ -4,6 +4,7 @@ if (cookie) SOCKET.emit('auth-cookie', cookie);
 
 let assets = {}; // stores the assets
 let trans = []; // stores the transformations
+let parts = []; // stores the particles
 let mMenu = {}; // the main menu inputs
 let lMenu = {}; // the login menu inputs
 let rMenu = {}; // the register menu inputs
@@ -322,14 +323,30 @@ function sketch(p) {
                     mMenu.start.draw(trans.scroll.cur + 1, 106, scale);
             }
             if (game.roomInfo.status == 'roll') {
-                mMenu.roll.draw(img.button2.cx, img.button2.bottom, scale);
+                mMenu.roll.draw(img.button2.left, img.button2.bottom, scale);
             }
             if (game.rolling == 'place') {
                 anim.place_13.draw(0, 0, 2, 'place', scale, false, false);
-                if (anim.place_13.finished('place')) game.rolling = 'peek';
+                if (anim.place_13.finished('place')) {
+                    game.rolling = 'peek';
+
+
+                }
             }
             if (game.rolling == 'peek') {
                 anim.peek_4.draw(0, 0, 2, 'peek', scale, false, false);
+
+                if (anim.peek_4.finished('peek') && parts.length == 0) {
+                    for (let d = 0; d < game.dice.diceList.length; d++) {
+                        let coords = game.dice.coords[d];
+                        let num = game.dice.diceList[d];
+                        new DicePart(coords.x, coords.y, num, d);
+                    }
+                }
+            }
+
+            for (let p of parts) {
+                p.draw();
             }
         }
 
@@ -630,19 +647,82 @@ class Dice {
         this.pattern = Math.floor(Math.random() * game.positions.length);
         this.diceList = diceList;
         this.diceModes = [];
-        this.diceList.forEach(() => 
+        this.diceList.forEach(() =>
             this.diceModes.push(Math.round(Math.random())));
+
+        this.coords = [];
+        for (let d = 0; d < this.diceList.length; d++) {
+            this.coords.push({
+                x: game.positions[this.pattern][d][0],
+                y: game.positions[this.pattern][d][1]
+            });
+        }
+
         game.dice = this;
     }
     draw(scale) {
         for (let d = 0; d < this.diceList.length; d++) {
             let num = this.diceList[d];
             let mode = this.diceModes[d] + 1;
-            let x = game.positions[this.pattern][d][0];
-            let y = game.positions[this.pattern][d][1];
 
-            img[`dice_${num}_${mode}`].draw(x, y, scale);
+            img[`dice_${num}_${mode}`].draw(this.coords[d].x, this.coords[d].y, scale);
         }
+    }
+}
+class DicePart {
+    constructor(x, y, number, index) {
+        this.x = x;
+        this.y = y;
+        this.number = number;
+        this.img = img[`big_${number}`];
+        this.index = index;
+
+        this.dest = {
+            x: center.x - 48 + index * 20,
+            y: this.img.bottom - 1
+        };
+
+        this.maxSpeed = 100;
+        this.ySpeed = -3;
+        this.yAcc = 0.5;
+        this.xSpeed = 1;
+        this.xAcc = 1;
+        this.dir = Math.sign(this.dest.x - this.x);
+
+        parts.push(this);
+    }
+    draw() {
+        this.img.draw(this.x, this.y, scale);
+
+        for (let i = 0; i < this.xSpeed; i++) {
+            this.x += this.dir;
+            if (this.x == this.dest.x) {
+                this.xSpeed = 0;
+                this.xAcc = 0;
+            };
+        }
+
+        if (this.ySpeed < 0) {
+            for (let i = this.ySpeed; i < 0; i++) {
+                this.y--;
+                if (this.y == this.dest.y) {
+                    this.ySpeed = 0;
+                    this.yAcc = 0;
+                }
+            }
+        } else {
+            for (let i = 0; i < this.ySpeed; i++) {
+                this.y++;
+                if (this.y == this.dest.y) {
+                    this.ySpeed = 0;
+                    this.yAcc = 0;
+                }
+            }
+        }
+
+        
+        if (this.xSpeed < this.maxSpeed) this.xSpeed += this.xAcc;
+        if (this.ySpeed < this.maxSpeed) this.ySpeed += this.yAcc;
     }
 }
 
