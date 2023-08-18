@@ -627,11 +627,12 @@ class Transform {
 }
 class Dice {
     constructor(diceList) {
-        this.pattern = Math.floor(Math.random() * dicePositions.length);
+        this.pattern = Math.floor(Math.random() * game.positions.length);
         this.diceList = diceList;
         this.diceModes = [];
-        this.diceList.forEach(() => this.diceModes.push(Math.round(Math.random())));
-        dice = this;
+        this.diceList.forEach(() => 
+            this.diceModes.push(Math.round(Math.random())));
+        game.dice = this;
     }
     draw(scale) {
         for (let d = 0; d < this.diceList.length; d++) {
@@ -640,7 +641,7 @@ class Dice {
             let x = dicePositions[this.pattern][d][0];
             let y = dicePositions[this.pattern][d][1];
 
-            assets.images[`dice_${num}_${mode}`].draw(x, y, scale);
+            img[`dice_${num}_${mode}`].draw(x, y, scale);
         }
     }
 }
