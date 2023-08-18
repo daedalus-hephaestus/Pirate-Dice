@@ -638,8 +638,8 @@ class Dice {
         for (let d = 0; d < this.diceList.length; d++) {
             let num = this.diceList[d];
             let mode = this.diceModes[d] + 1;
-            let x = dicePositions[this.pattern][d][0];
-            let y = dicePositions[this.pattern][d][1];
+            let x = game.positions[this.pattern][d][0];
+            let y = game.positions[this.pattern][d][1];
 
             img[`dice_${num}_${mode}`].draw(x, y, scale);
         }
