@@ -3,30 +3,35 @@ let cookie = getCookie('auth_cookie');
 if (cookie) SOCKET.emit('auth-cookie', cookie);
 
 let assets = {}; // stores the assets
-let transforms = []; // stores the transformations
+let trans = []; // stores the transformations
+let mMenu = {}; // the main menu inputs
+let lMenu = {}; // the login menu inputs
+let rMenu = {}; // the register menu inputs
 
-let mainMenu = {}; // the main menu inputs
-let loginMenu = {}; // the login menu inputs
-let registerMenu = {}; // the register menu inputs
+let anim;
+let img;
 
 let newClick = true; // whether or not the current click is a new click
-let scene = 'menu'; // the current scene
-let font; // stores the font
-let bannerText = '';
-let username;
-let room = '';
-let roomInfo = {};
-let dicePositions = [
-    [[131, 105], [140, 108], [128, 113], [145, 116], [136, 119]],
-    [[127, 108], [120, 113], [140, 107], [134, 112], [143, 117]],
-    [[120, 105], [131, 103], [127, 111], [141, 108], [135, 114]],
-];
-let dice = false;
-let rolling = false;
+let center; // stores the center point of the canvas
+let scale; // stores the pixel scale
+
+let game = {
+    scene: 'menu',
+    bannerText: '',
+    username: '',
+    roomID: '',
+    roomInfo: {},
+    positions: [
+        [[131, 105], [140, 108], [128, 113], [145, 116], [136, 119]],
+        [[127, 108], [120, 113], [140, 107], [134, 112], [143, 117]],
+        [[120, 105], [131, 103], [127, 111], [141, 108], [135, 114]],
+    ],
+    roll: false,
+    rolling: false
+};
+
 
 function sketch(p) {
-    let center; // stores the center point of the canvas
-
     p.preload = function () {
         // loops through the asset types
         for (let t in assets) {
@@ -39,10 +44,21 @@ function sketch(p) {
             }
         }
         // loads the font
-        font = p.loadFont('fonts/pixel_pirate.ttf');
+        game.font = p.loadFont('fonts/pixel_pirate.ttf');
     };
     p.setup = function () {
         p.createCanvas(p.windowWidth, p.windowHeight); // creates the canvas
+
+        anim = assets.animations; // saves the animations to a shorter variable
+        img = assets.images; // saves the images to a shorter variable
+
+        center = {
+            x: img.table.image.width / 2,
+            y: img.table.image.height / 2
+        };
+
+        scale = p.windowWidth / assets.images.table.image.width;
+
         // loops through the asset types
         for (let t in assets) {
             // loops through the assets
@@ -52,92 +68,88 @@ function sketch(p) {
             }
         }
 
-        // updates the center point on the canvas
-        center = {
-            x: assets.images.table.w / 2,
-            y: assets.images.table.h / 2
-        };
-
-        // saves some widths to cut down on repetition
-        let b1Width = assets.images.button1.w;
-        let b2Width = assets.images.button2.w;
-        let iWidth = assets.images.input.w;
-        let sWidth = assets.images.scroll.w;
-
         // the main menu play button
-        mainMenu.play = new ButtonClass('Play', 'button1', () => {
+        mMenu.play = new ButtonClass('Play', 'button1', () => {
             SOCKET.emit('play', {
-                username: username,
-                room: mainMenu.room.value()
+                username: game.username,
+                room: mMenu.room.value()
             });
         }, p);
         // the room code input
-        mainMenu.room = new InputClass('text', 'room code', 'input', 5, p);
+        mMenu.room = new InputClass('text', 'room code', 'input', 5, p);
         // the main menu login button
-        mainMenu.login = new ButtonClass('Login', 'button1', () => {
-            scene = 'login'; // set scene to login
-            transforms.play.start(); // on click, start the transition
+        mMenu.login = new ButtonClass('Login', 'button1', () => {
+            game.scene = 'login'; // set scene to login
+            trans.play.start(); // on click, start the transition
         }, p);
         // the main menu register button
-        mainMenu.register = new ButtonClass('Register', 'button1', () => {
-            scene = 'register'; // set scene to register
-            transforms.play.start(); // starts the transition
+        mMenu.register = new ButtonClass('Register', 'button1', () => {
+            game.scene = 'register'; // set scene to register
+            trans.play.start(); // starts the transition
         }, p);
         // the back button
-        mainMenu.back = new ButtonClass('Back', 'button2', () => {
+        mMenu.back = new ButtonClass('Back', 'button2', () => {
             // if the scene is login, move the username off the screen
-            if (scene == 'login') transforms.username.start(true);
-            if (scene == 'register') transforms.usernameR.start(true);
-            if (scene == 'dashboard') SOCKET.emit('leave-room');
+            if (game.scene == 'login') trans.username.start(true);
+            if (game.scene == 'register') trans.usernameR.start(true);
+            if (game.scene == 'dashboard') SOCKET.emit('leave-room');
         }, p);
         // the logout button
-        mainMenu.logout = new ButtonClass('Logout', 'button1', () => {
+        mMenu.logout = new ButtonClass('Logout', 'button1', () => {
             SOCKET.emit('logout');
             window.location.reload();
         }, p);
-        mainMenu.start = new ButtonClass('Start', 'button2', () => {
+        mMenu.start = new ButtonClass('Start', 'button2', () => {
             SOCKET.emit('start-game');
         }, p);
-        mainMenu.roll = new ButtonClass('Roll', 'button2', () => {
+        mMenu.roll = new ButtonClass('Roll', 'button2', () => {
             SOCKET.emit('roll');
-            rolling = 'place';
+            game.rolling = 'place';
         }, p);
 
         // the login menu username input
-        loginMenu.username = new InputClass('text', 'username', 'input', 20, p);
+        lMenu.username = new InputClass('text', 'username', 'input', 20, p);
         // the login menu password input
-        loginMenu.password = new InputClass('password', 'password', 'input', 24, p)
+        lMenu.password = new InputClass('password', 'password', 'input', 24, p)
         // the login menu login button
-        loginMenu.login = new ButtonClass('Login', 'button1', () => {
-            if (loginMenu.username == '') return alert('Please enter a username');
-            if (loginMenu.password == '') return alert('Please enter a password');
+        lMenu.login = new ButtonClass('Login', 'button1', () => {
+            if (lMenu.username == '')  // if there is no username
+                return alert('Please enter a username');
+            if (lMenu.password == '')  // if there is no password
+                return alert('Please enter a password');
             SOCKET.emit('login', {
-                username: loginMenu.username.value(),
-                password: loginMenu.password.value()
+                username: lMenu.username.value(),
+                password: lMenu.password.value()
             });
         }, p);
 
         // the register menu username input
-        registerMenu.username = new InputClass('text', 'username', 'input', 20, p);
+        rMenu.username = new InputClass('text', 'username', 'input', 20, p);
         // the register menu email input
-        registerMenu.email = new InputClass('email', 'email', 'input', 50, p);
+        rMenu.email = new InputClass('email', 'email', 'input', 50, p);
         // the register menu password 1 input
-        registerMenu.password1 = new InputClass('password', 'password', 'input', 50, p);
+        rMenu.password1 = new InputClass('password', 'password', 'input', 50, p);
         // the register menu password 2 input
-        registerMenu.password2 = new InputClass('password', 'repeat', 'input', 50, p);
+        rMenu.password2 = new InputClass('password', 'repeat', 'input', 50, p);
         // the register menu button
-        registerMenu.register = new ButtonClass('Register', 'button1', () => {
-            let username = registerMenu.username.value();
-            let email = registerMenu.email.value();
-            let password1 = registerMenu.password1.value();
-            let password2 = registerMenu.password2.value();
+        rMenu.register = new ButtonClass('Register', 'button1', () => {
+            let username = rMenu.username.value();
+            let email = rMenu.email.value();
+            let password1 = rMenu.password1.value();
+            let password2 = rMenu.password2.value();
 
-            if (username.length < 4) return alert('Username must be four\nor more characters');
-            if (!/^[A-Za-z0-9]*$/.test(username)) return alert('Username can only have\nletters and numbers');
-            if (!/\@[A-Za-z]+\.[A-Za-z]+$/.test(email)) return alert('Please enter a valid email');
-            if (/\s/.test(password1)) return alert('Your password can\'t\ninclude spaces');
-            if (password1.length < 8) return alert('Your password must eight\nor more characters');
-            if (password1 !== password2) return alert('Your passwords don\'t match');
+            if (username.length < 4) // if the username is too short
+                return alert('Username must be four\nor more characters');
+            if (!/^[A-Za-z0-9]*$/.test(username)) // only letters and numbers
+                return alert('Username can only have\nletters and numbers');
+            if (!/\@[A-Za-z]+\.[A-Za-z]+$/.test(email)) // checks valid email
+                return alert('Please enter a valid email');
+            if (/\s/.test(password1)) // checks password for whitespace
+                return alert('Your password can\'t\ninclude spaces');
+            if (password1.length < 8) // checks password length
+                return alert('Your password must eight\nor more characters');
+            if (password1 !== password2) // checks if passwords match
+                return alert('Your passwords don\'t match');
 
             SOCKET.emit('register', {
                 username,
@@ -147,91 +159,98 @@ function sketch(p) {
 
         }, p);
 
+        // saves some images to cut down on repetition
+        let b1 = img.button1;
+        let b2 = img.button2;
+        let i = img.input;
+        let s = img.scroll;
+
+        console.log(b1);
 
         // MAIN MENU TRANSFORMS
-        new Transform('play', center.x - b1Width / 2, -b1Width, 40, 4, () => {
-            transforms.room.start(); // starts moving the login button off
+        new Transform('play', b1.cx, b1.ol, 40, 4, () => {
+            trans.room.start(); // starts moving the login button off
         }, () => {
-            transforms.room.start(true); // starts moving the login button on
+            trans.room.start(true); // starts moving the login button on
         });
-        new Transform('room', center.x - iWidth / 2, center.x * 2, 40, 4, () => {
-            transforms.login.start();
+        new Transform('room', i.cx, i.or, 40, 4, () => {
+            trans.login.start();
         }, () => {
-            transforms.login.start(true);
+            trans.login.start(true);
         });
         // the main menu login button transform
-        new Transform('login', center.x - b1Width / 2, -b1Width, 40, 4, () => {
-            transforms.register.start(); // starts moving the register button off
+        new Transform('login', b1.cx, b1.ol, 40, 4, () => {
+            trans.register.start(); // starts moving the register button off
         }, () => {
-            transforms.register.start(true); // starts moving the register button on
+            trans.register.start(true); // starts moving the register button on
         });
-        new Transform('register', center.x - b1Width / 2, center.x * 2, 40, 4, () => {
+        new Transform('register', b1.cx, b1.or, 40, 4, () => {
             // if the scene is login, transform in the username input
-            if (scene == 'login') transforms.username.start();
-            if (scene == 'register') transforms.usernameR.start();
-            if (scene == 'dashboard') transforms.back.start();
+            if (game.scene == 'login') trans.username.start();
+            if (game.scene == 'register') trans.usernameR.start();
+            if (game.scene == 'dashboard') trans.back.start();
         }, () => {
         });
-        new Transform('banner', -assets.images.banner.h, 1, 40, 4, () => {
+        new Transform('banner', -img.banner.h, 1, 40, 4, () => {
 
         }, () => {
-            bannerText = '';
+            game.bannerText = '';
         });
-        new Transform('back', -b2Width, 1, 40, 4, () => {
-            if (scene == 'dashboard') transforms.scroll.start();
+        new Transform('back', b2.ol, 1, 40, 4, () => {
+            if (game.scene == 'dashboard') trans.scroll.start();
         }, () => {
-            if (scene != 'dashboard') scene = 'menu';
-            transforms.play.start(true);
+            if (game.scene != 'dashboard') game.scene = 'menu';
+            trans.play.start(true);
         });
 
         // LOGIN MENU TRANSFORMS
-        new Transform('username', -iWidth, center.x - iWidth / 2, 40, 4, () => {
-            transforms.password.start();
+        new Transform('username', i.ol, i.cx, 40, 4, () => {
+            trans.password.start();
         }, () => {
-            transforms.password.start(true);
+            trans.password.start(true);
         });
-        new Transform('password', center.x * 2, center.x - iWidth / 2, 40, 4, () => {
-            transforms.login2.start();
+        new Transform('password', i.or, i.cx, 40, 4, () => {
+            trans.login2.start();
         }, () => {
-            transforms.login2.start(true);
+            trans.login2.start(true);
         });
-        new Transform('login2', -b1Width, center.x - b1Width / 2, 40, 4, () => {
-            transforms.back.start();
+        new Transform('login2', b1.ol, b1.cx, 40, 4, () => {
+            trans.back.start();
         }, () => {
-            transforms.back.start(true);
+            trans.back.start(true);
         });
 
 
         // REGISTER MENU TRANSFORMS
-        new Transform('usernameR', -iWidth, center.x - iWidth / 2, 40, 4, () => {
-            transforms.email.start();
+        new Transform('usernameR', i.ol, i.cx, 40, 4, () => {
+            trans.email.start();
         }, () => {
-            transforms.email.start(true);
+            trans.email.start(true);
         });
-        new Transform('email', center.x * 2, center.x - iWidth / 2, 40, 4, () => {
-            transforms.password1.start();
+        new Transform('email', i.or, i.cx, 40, 4, () => {
+            trans.password1.start();
         }, () => {
-            transforms.password1.start(true);
+            trans.password1.start(true);
         });
-        new Transform('password1', -iWidth, center.x - iWidth / 2, 40, 4, () => {
-            transforms.password2.start();
+        new Transform('password1', i.ol, i.cx, 40, 4, () => {
+            trans.password2.start();
         }, () => {
-            transforms.password2.start(true);
+            trans.password2.start(true);
         });
-        new Transform('password2', center.x * 2, center.x - iWidth / 2, 40, 4, () => {
-            transforms.registerR.start();
+        new Transform('password2', i.or, i.cx, 40, 4, () => {
+            trans.registerR.start();
         }, () => {
-            transforms.registerR.start(true);
+            trans.registerR.start(true);
         });
-        new Transform('registerR', -b1Width, center.x - b1Width / 2, 40, 4, () => {
-            transforms.back.start();
+        new Transform('registerR', b1.ol, b1.cx, 40, 4, () => {
+            trans.back.start();
         }, () => {
-            transforms.back.start(true);
+            trans.back.start(true);
         });
 
         // GAME MENU TRANSFORMS
-        new Transform('scroll', -sWidth, 0, 40, 4, () => { }, () => {
-            transforms.back.start(true);
+        new Transform('scroll', s.ol, s.top, 40, 4, () => { }, () => {
+            trans.back.start(true);
         });
 
     };
@@ -239,105 +258,104 @@ function sketch(p) {
         p.background(0, 0, 0);
         p.noSmooth();
 
-        for (let t in transforms) {
-            if (transforms[t].running) transforms[t].run();
-        }
+        for (let t in trans) if (trans[t].running) trans[t].run();
 
-        let scale = p.windowWidth / assets.images.table.w;
-
-
-
-        assets.images.table.draw(0, 0, scale);
-        assets.animations.candle_12.draw(34, 16, 1, 'candle1', scale, true);
-        assets.animations.candle_12.draw(80, 10, 1.5, 'candle2', scale, true);
-        assets.animations.candle_12.draw(280, 90, 1.25, 'candle3', scale, true);
-        assets.animations.candle_12.draw(210, 70, 1.1, 'candle4', scale, true);
+        img.table.draw(0, 0, scale);
+        anim.candle_12.draw(34, 16, 1, 'candle1', scale, true);
+        anim.candle_12.draw(80, 10, 1.5, 'candle2', scale, true);
+        anim.candle_12.draw(280, 90, 1.25, 'candle3', scale, true);
+        anim.candle_12.draw(210, 70, 1.1, 'candle4', scale, true);
 
         // draws the menu buttons
-        mainMenu.play.draw(transforms.play.cur, 1, scale);
-        mainMenu.room.draw(transforms.room.cur, 41, scale);
-        if (scene != 'dashboard') { // if the scene is not the dashboard
-            mainMenu.login.draw(transforms.login.cur, 70, scale);
-            mainMenu.register.draw(transforms.register.cur, 110, scale);
-        } else if (scene == 'dashboard') // if the scene is the dashboard
-            mainMenu.logout.draw(transforms.login.cur, 70, scale);
+        mMenu.play.draw(trans.play.cur, 1, scale);
+        mMenu.room.draw(trans.room.cur, 41, scale);
 
-        mainMenu.back.draw(transforms.back.cur, 1, scale);
+        if (game.scene != 'dashboard') { // if the scene is not the dashboard
+            mMenu.login.draw(trans.login.cur, 70, scale);
+            mMenu.register.draw(trans.register.cur, 110, scale);
+        } else if (game.scene == 'dashboard') // if the scene is the dashboard
+            mMenu.logout.draw(trans.login.cur, 70, scale);
 
-        p.textFont(font, 6 * scale);
+        mMenu.back.draw(trans.back.cur, 1, scale);
+
+        p.textFont(game.font, 6 * scale);
         p.textAlign(p.RIGHT, p.TOP);
         p.fill(255, 255, 255);
 
 
-        if (room) {
-            let leftSide = (center.x * 2 - 1) * scale; // the left side of the screen
+        if (game.room) {
+            // the right side of the screen
+            let rSide = (center.x * 2 - 1) * scale;
 
             // displays the room number
-            p.text(`${room ? 'Room:' : ''} ${room}`, leftSide, 1 * scale);
+            if (game.room) p.text(`Room: ${game.room}`, rSide, 1 * scale);
 
-            p.textSize(4 * scale); // shrinks the text side
+            p.textSize(4 * scale); // shrinks the text size
 
-            let owner = roomInfo.owner; // saves the room owner
+            let owner = game.roomInfo.owner; // saves the room owner
             // sets the ownership label
-            let label = `owner: ${owner}${owner == username ? '  (you)' : ''}`;
-            p.text(label, leftSide, 10 * scale); // displays the room owner
+            let label = `owner: ${owner}`;
+            // adds "(you)" to the label if you are the owner
+            label += owner == game.username ? '  (you)' : '';
+            p.text(label, rSide, 10 * scale); // displays the room owner
 
-            if (dice && rolling !== 'place') dice.draw(scale);
+            if (game.dice && game.rolling !== 'place') game.dice.draw(scale);
 
             // if the game is waiting to start
-            if (roomInfo.status == 'waiting') {
-                assets.images.scroll.draw(transforms.scroll.cur, 24, scale);
+            if (game.roomInfo.status == 'waiting') {
+                img.scroll.draw(trans.scroll.cur, 24, scale);
+
+                let xc = (trans.scroll.cur + 4) * scale;
 
                 p.fill("#541d29");
                 p.textAlign(p.LEFT, p.TOP);
-                p.text('Players\n--------------------', (transforms.scroll.cur + 4) * scale, 36 * scale)
-                for (let i = 0; i < roomInfo.players.length; i++) {
-                    let player = roomInfo.players[i];
-                    p.text(player.username, (transforms.scroll.cur + 4) * scale, (i * 6 + 46) * scale);
+                p.text('Players\n--------------------', xc, 36 * scale);
+
+                let playerCount = game.roomInfo.players.length;
+                for (let i = 0; i < playerCount; i++) {
+                    let player = game.roomInfo.players[i];
+                    p.text(player.username, xc, (i * 6 + 46) * scale);
+
                 }
 
-                if (roomInfo.owner == username) {
-                    mainMenu.start.draw(transforms.scroll.cur + 1, 106, scale);
-                }
+                if (game.roomInfo.owner == game.username)
+                    mMenu.start.draw(trans.scroll.cur + 1, 106, scale);
             }
-            if (roomInfo.status == 'roll') {
-                mainMenu.roll.draw(center.x - assets.images.button2.w / 2, center.y * 2 - assets.images.button2.h, scale);
-
+            if (game.roomInfo.status == 'roll') {
+                mMenu.roll.draw(img.button2.cx, img.button2.bottom, scale);
             }
-            if (rolling == 'place') {
-                assets.animations.place_13.draw(0, 0, 2, 'place', scale, false, false);
-                if (assets.animations.place_13.finished('place')) rolling = 'peek';
+            if (game.rolling == 'place') {
+                anim.place_13.draw(0, 0, 2, 'place', scale, false, false);
+                if (anim.place_13.finished('place')) game.rolling = 'peek';
             }
-            if (rolling == 'peek') {
-                assets.animations.peek_4.draw(0, 0, 2, 'peek', scale, false, false);
+            if (game.rolling == 'peek') {
+                anim.peek_4.draw(0, 0, 2, 'peek', scale, false, false);
             }
         }
 
         // the login menu buttons (initially off screen)
-        loginMenu.username.draw(transforms.username.cur, 1, scale);
-        loginMenu.password.draw(transforms.password.cur, 30, scale);
-        loginMenu.login.draw(transforms.login2.cur, 59, scale);
+        lMenu.username.draw(trans.username.cur, 1, scale);
+        lMenu.password.draw(trans.password.cur, 30, scale);
+        lMenu.login.draw(trans.login2.cur, 59, scale);
 
         // the register menu buttons (initially off screen)
-        registerMenu.username.draw(transforms.usernameR.cur, 1, scale);
-        registerMenu.email.draw(transforms.email.cur, 30, scale);
-        registerMenu.password1.draw(transforms.password1.cur, 59, scale)
-        registerMenu.password2.draw(transforms.password2.cur, 88, scale);
-        registerMenu.register.draw(transforms.registerR.cur, 117, scale);
+        rMenu.username.draw(trans.usernameR.cur, 1, scale);
+        rMenu.email.draw(trans.email.cur, 30, scale);
+        rMenu.password1.draw(trans.password1.cur, 59, scale)
+        rMenu.password2.draw(trans.password2.cur, 88, scale);
+        rMenu.register.draw(trans.registerR.cur, 117, scale);
 
         // Draws the banner
-        let bannerX = center.x - assets.images.banner.w / 2;
-        let bannerY = transforms.banner.cur;
-        assets.images.banner.draw(bannerX, bannerY, scale);
+        img.banner.draw(img.banner.cx, trans.banner.cur, scale);
 
         p.fill(255, 255, 255);
         p.noStroke();
-        p.textFont(font, 6 * scale);
+        p.textFont(game.font, 6 * scale);
         p.textAlign(p.CENTER, p.CENTER);
         p.text(
-            bannerText,
+            game.bannerText,
             center.x * scale,
-            (transforms.banner.cur + assets.images.banner.h / 2) * scale,
+            (trans.banner.cur + img.banner.h / 2) * scale,
         );
 
         /*if (p.mouseIsPressed && newClick) {
@@ -345,20 +363,19 @@ function sketch(p) {
             newClick = false;
         }*/
 
-        p.textSize(8 * scale);
-        p.text(`${Math.round(p.mouseX / scale)}, ${Math.round(p.mouseY / scale)}`, p.mouseX + 10 * scale, p.mouseY + 10 * scale)
     };
     p.windowResized = function () {
         p.resizeCanvas(p.windowWidth, p.windowHeight);
         center = {
-            x: assets.images.table.w / 2,
-            y: p.windowHeight / 2
+            x: img.table.image.width / 2,
+            y: img.table.image.height / 2
         };
+        scale = p.windowWidth / assets.images.table.image.width;
     }
     p.mousePressed = function () {
-        if (newClick && bannerText) {
+        if (newClick && game.bannerText) {
             newClick = false;
-            transforms.banner.start(true);
+            trans.banner.start(true);
         };
     };
     p.mouseReleased = function () {
@@ -381,11 +398,11 @@ function getCookie(key) { // fetches a cookie based on a value
     return false;
 }
 function alert(message) {
-    bannerText = `AHOY!\n${message}`;
-    transforms.banner.start();
+    game.bannerText = `AHOY!\n${message}`;
+    trans.banner.start();
 };
 function click(action) {
-    if (newClick && !bannerText) {
+    if (newClick && !game.bannerText) {
         newClick = false;
         action();
     }
@@ -403,11 +420,11 @@ class AnimationClass {
     }
     loadFrames() {
         this.frames = []; // stores each frame
-        this.fw = this.image.width / this.frameCount; // the frame width
-        this.fh = this.image.height; // the frame height
+        this.w = this.image.width / this.frameCount; // the frame width
+        this.h = this.image.height; // the frame height
         for (let i = 0; i < this.frameCount; i++) {
             // adds each frame to the frame array
-            this.frames.push(this.image.get(i * this.fw, 0, this.fw, this.fh));
+            this.frames.push(this.image.get(i * this.w, 0, this.w, this.h));
         }
     }
     draw(x, y, speed, id, scale = 1, random = false, loop = true) {
@@ -421,7 +438,7 @@ class AnimationClass {
             loop ? this.instances[id] = 0 : this.instances[id] = (this.frameCount - 1) * 10;
 
         let cur = this.frames[Math.floor(this.instances[id] / 10)];
-        this.c.image(cur, x * scale, y * scale, this.fw * scale, this.fh * scale);
+        this.c.image(cur, x * scale, y * scale, this.w * scale, this.h * scale);
     }
     finished(id) {
         return this.instances[id] == (this.frameCount - 1) * 10;
@@ -435,12 +452,22 @@ class ImageClass {
         this.image = context.loadImage(this.path);
         assets.images[name] = this;
     }
-    draw(x, y, scale = 1) {
-        this.c.image(this.image, x * scale, y * scale, this.w * scale, this.h * scale)
+    draw(x, y, s = 1) {
+        this.c.image(this.image, x * s, y * s, this.w * s, this.h * s);
     }
     loadFrames() {
         this.w = this.image.width;
         this.h = this.image.height;
+
+        this.ol = -this.w; // the offscreen left coordinate
+        this.or = center.x * 2; // the offscreen left coordinate
+        this.cx = center.x - this.w / 2; // the centered x coordinate
+        this.cy = center.y - this.h / 2; // the centered y coordinate
+        this.left = 0; // the left align coordinate
+        this.right = center.x * 2 - this.w; // the right align coordinate
+        this.top = 0; // the top align coordiante
+        this.bottom = center.y * 2 - this.h; // the bottom align coordinate;
+
     }
 }
 class ButtonClass {
@@ -456,13 +483,13 @@ class ButtonClass {
     draw(x, y, scale = 1) {
         if (this.image) this.image.draw(x, y, scale);
 
-        for (let t in transforms) {
-            if (transforms[t].running) transforms[t].update
+        for (let t in trans) {
+            if (trans[t].running) trans[t].update
         }
 
         this.c.fill(255, 255, 255);
         this.c.noStroke();
-        this.c.textFont(font, 8 * scale);
+        this.c.textFont(game.font, 8 * scale);
         this.c.textAlign(this.c.CENTER, this.c.CENTER);
         this.c.text(this.text, (x + this.w / 2) * scale, (y + this.h / 2) * scale);
         if (this.hover(x, y, scale, this.c.touches) && this.c.mouseIsPressed) {
@@ -513,7 +540,7 @@ class InputClass {
         let value = this.input.value;
 
         this.c.noStroke();
-        this.c.textFont(font, 8 * scale);
+        this.c.textFont(game.font, 8 * scale);
         this.c.textAlign(this.c.LEFT, this.c.CENTER);
         this.c.fill(125, 125, 125);
 
@@ -561,7 +588,7 @@ class Transform {
         this.cbb = cbb;
         this.running = false;
         this.speed = 0;
-        transforms[this.name] = this;
+        trans[this.name] = this;
     }
     run() {
         if (this.speed < this.maxSpeed) this.speed += this.acceleration;
@@ -633,16 +660,15 @@ SOCKET.on('unavailable', (data) => {
     alert(`That ${data} is unavailable`);
 });
 SOCKET.on('correct', (data) => {
-    username = data;
-    console.log(username);
-    if (scene == 'login') transforms.username.start(true);
-    scene = 'dashboard';
+    game.username = data;
+    if (game.scene == 'login') trans.username.start(true);
+    game.scene = 'dashboard';
 });
 SOCKET.on('incorrect', () => {
     alert('username or password incorrect');
 });
 SOCKET.on('user-created', () => {
-    transforms.usernameR.start(true);
+    trans.usernameR.start(true);
 })
 SOCKET.on('auth-cookie', (data) => {
     document.cookie = `auth_cookie=${data}`;
@@ -652,13 +678,12 @@ SOCKET.on('delete-cookie', () => {
         'auth_cookie=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
 });
 SOCKET.on('room-update', (data) => {
-    roomInfo = data;
-    console.log(data);
+    game.roomInfo = data;
 });
 SOCKET.on('room-closed', (data) => {
-    room = '';
-    roomInfo = {};
-    transforms.scroll.start(true);
+    game.room = '';
+    game.roomInfo = {};
+    trans.scroll.start(true);
     alert(`You have left room ${data}`);
 });
 SOCKET.on('room-unjoinable', () => {
@@ -677,18 +702,18 @@ SOCKET.on('room-not-found', () => {
     alert('room not found');
 });
 SOCKET.on('logout', () => {
-    //window.location.reload();
+    window.location.reload();
 });
 SOCKET.on('owner', (data) => {
-    room = data;
-    transforms.play.start(); // starts the transition
+    game.room = data;
+    trans.play.start(); // starts the transition
 });
 SOCKET.on('room-joined', (data) => {
-    room = data;
-    transforms.play.start(); // starts the transition
+    game.room = data;
+    trans.play.start(); // starts the transition
 });
 SOCKET.on('your-roll', (data) => {
-    dice = new Dice(data);
+    game.dice = new Dice(data);
 });
 SOCKET.on('small-bet', () => {
     alert('your bet is too small');
