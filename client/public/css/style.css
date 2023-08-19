@@ -5,6 +5,7 @@ body {
 html {
     padding: 0;
     margin: 0 auto;
+    overscroll-behavior: none;
 }
 .hiddendiv {
     position: absolute;
