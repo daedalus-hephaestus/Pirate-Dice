@@ -33,7 +33,8 @@ let game = {
         number: 1
     },
     roll: false,
-    rolling: false
+    rolling: false,
+    betY: 0
 };
 
 
@@ -124,6 +125,15 @@ function sketch(p) {
         mMenu.dNumber = new ButtonClass('', 'decrease', () => {
             game.bet.number == 1 ? game.bet.number = 6 : game.bet.number--;
         }, p);
+        mMenu.bet = new ButtonClass('bet', 'button2', () => {
+            SOCKET.emit('bet', {
+                number: game.bet.number,
+                amount: game.bet.amount
+            });
+        }, p);
+        mMenu.liar = new ButtonClass('liar', 'button2', () => {
+            SOCKET.emit('liar');
+        }, p)
 
         // the login menu username input
         lMenu.username = new InputClass('text', 'username', 'input', 20, p);
@@ -182,6 +192,7 @@ function sketch(p) {
         let b2 = img.button2;
         let i = img.input;
         let s = img.scroll;
+        let b = img.bets;
 
         // MAIN MENU TRANSFORMS
         new Transform('play', b1.cx, b1.ol, 40, 4, () => {
@@ -266,8 +277,19 @@ function sketch(p) {
 
         // GAME MENU TRANSFORMS
         new Transform('scroll', s.ol, s.top, 40, 4, () => { }, () => {
-            trans.back.start(true);
+            if (game.roomInfo.status == 'roll') {
+                trans.roll.start();
+            } else {
+                trans.back.start(true);
+            }
         });
+        new Transform('roll', b2.ol, b2.left, 40, 4, () => { }, () => { });
+        new Transform('bet', p.windowHeight, 107, 40, 4, () => { }, () => { });
+        new Transform('betScroll', b.or, b.right, 40, 4, () => {
+
+        }, () => {
+
+        })
 
     };
     p.draw = function () {
@@ -306,7 +328,7 @@ function sketch(p) {
             // displays the room number
             if (game.room) p.text(`Room: ${game.room}`, rSide, 1 * scale);
 
-            p.textSize(4 * scale); // shrinks the text size
+            p.textSize(3 * scale); // shrinks the text size
 
             let owner = game.roomInfo.owner; // saves the room owner
             // sets the ownership label
@@ -318,29 +340,32 @@ function sketch(p) {
             if (game.dice && game.rolling !== 'place') game.dice.draw(scale);
 
             // if the game is waiting to start
-            if (game.roomInfo.status == 'waiting') {
-                img.scroll.draw(trans.scroll.cur, 24, scale);
-
-                let xc = (trans.scroll.cur + 4) * scale;
-
-                p.fill("#541d29");
-                p.textAlign(p.LEFT, p.TOP);
-                p.text('Players\n--------------------', xc, 36 * scale);
-
-                let playerCount = game.roomInfo.players.length;
-                for (let i = 0; i < playerCount; i++) {
-                    let player = game.roomInfo.players[i];
-                    p.text(player.username, xc, (i * 6 + 46) * scale);
-
-                }
-
-                if (game.roomInfo.owner == game.username)
-                    mMenu.start.draw(trans.scroll.cur + 1, 106, scale);
+            img.scroll.draw(trans.scroll.cur, 24, scale);
+            let xc = (trans.scroll.cur + 4) * scale;
+            p.fill("#541d29");
+            p.textAlign(p.LEFT, p.TOP);
+            p.text('Players               Dice', xc, 36 * scale);
+            p.text('\n--------------------------', xc, 36 * scale);
+            let playerCount = game.roomInfo.players.length;
+            for (let i = 0; i < playerCount; i++) {
+                let player = game.roomInfo.players[i];
+                let label = `${player.username}         ${player.diceCount}`;
+                p.text(label, xc, (i * 6 + 46) * scale);
             }
-            
-            if (game.roomInfo.status == 'roll' && !game.dice) {
-                mMenu.roll.draw(img.button2.left, img.button2.bottom, scale);
+            if (game.roomInfo.owner == game.username)
+                mMenu.start.draw(trans.scroll.cur + 1, 106, scale);
+
+            // the roll button
+            mMenu.roll.draw(trans.roll.cur, img.button2.bottom, scale);
+            // the bet container
+            img.bets.draw(trans.betScroll.cur, img.bets.bottom, scale);
+
+            for (let i = 0; i < game.roomInfo.bets.length; i++) {
+                console.log(game.roomInfo.bets);
             }
+
+
+            // the roll animations
             if (game.rolling == 'place') {
                 anim.place_13.draw(0, 0, 2, 'place', scale, false, false);
                 if (anim.place_13.finished('place')) {
@@ -349,10 +374,8 @@ function sketch(p) {
                     anim.peek_4.reset('peek');
                     anim.place_13.reset('place');
                 }
-            }
-            if (game.rolling == 'peek') {
+            } else if (game.rolling == 'peek') {
                 anim.peek_4.draw(0, 0, 2, 'peek', scale, false, false);
-
                 if (anim.peek_4.finished('peek') && parts.length == 0) {
                     for (let d = 0; d < game.dice.diceList.length; d++) {
                         let coords = game.dice.coords[d];
@@ -362,28 +385,34 @@ function sketch(p) {
                 }
             }
 
-            if (game.roomInfo.status == 'betting') {
-                
-                mMenu.iAmount.draw(210, 100, scale);
-                img.display.draw(210, 110, scale);
-                mMenu.dAmount.draw(210, 142, scale);
+            // the bet amount
+            mMenu.iAmount.draw(1, trans.bet.cur, scale);
+            img.display.draw(1, trans.bet.cur + 10, scale);
+            mMenu.dAmount.draw(1, trans.bet.cur + 42, scale);
+            p.textSize(10 * scale);
+            p.fill(255, 255, 255);
+            p.textAlign(p.CENTER, p.CENTER);
+            p.text(
+                `${game.bet.amount}`,
+                17 * scale,
+                (trans.bet.cur + 26) * scale
+            );
 
-                p.textSize(10 * scale);
-                p.fill(255, 255, 255);
-                p.textAlign(p.CENTER, p.CENTER);
-                p.text(`${game.bet.amount}`, 226 * scale, 126 * scale);
-
-                mMenu.iNumber.draw(244, 100, scale);
-                img.display.draw(244, 110, scale);
-                mMenu.dNumber.draw(244, 142, scale);
-
-                img[`big_${game.bet.number}`].draw(251, 117, scale);
-                
-            }
+            // the bet number
+            mMenu.iNumber.draw(34, trans.bet.cur, scale);
+            img.display.draw(34, trans.bet.cur + 10, scale);
+            mMenu.dNumber.draw(34, trans.bet.cur + 42, scale);
+            let name = `big_${game.bet.number}`;
+            img[name].draw(41, trans.bet.cur + 17, scale);
 
             for (let p of parts) {
                 p.draw();
             }
+
+            // the bet button
+            mMenu.bet.draw(67, trans.bet.cur + 5, scale);
+            // the liar button
+            mMenu.liar.draw(67, trans.bet.cur + 27, scale);
         }
 
         // the login menu buttons (initially off screen)
@@ -429,7 +458,7 @@ function sketch(p) {
     p.mouseReleased = function () {
         setTimeout(() => { newClick = true }, 500);
     }
-    p.mouseWheel = function(event) {
+    p.mouseWheel = function (event) {
     }
     p.mouseDragged = function () {
     };
@@ -495,7 +524,7 @@ class AnimationClass {
     finished(id) {
         return this.instances[id] == (this.frameCount - 1) * 10;
     }
-    reset (id) {
+    reset(id) {
         if (this.instances[id]) this.instances[id] = 0;
     }
 }
@@ -760,7 +789,7 @@ class DicePart {
             }
         }
 
-        
+
         if (this.xSpeed < this.maxXSpeed) this.xSpeed += this.xAcc;
         if (this.ySpeed < this.maxYSpeed) this.ySpeed += this.yAcc;
     }
@@ -799,6 +828,12 @@ SOCKET.on('delete-cookie', () => {
         'auth_cookie=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
 });
 SOCKET.on('room-update', (data) => {
+    if (game.roomInfo.status == 'waiting' && data.status == 'roll') {
+        trans.scroll.start(true);
+    }
+    if (game.roomInfo.status == 'roll' && data.status == 'betting') {
+        trans.betScroll.start();
+    }
     game.roomInfo = data;
 });
 SOCKET.on('room-closed', (data) => {
@@ -835,6 +870,10 @@ SOCKET.on('room-joined', (data) => {
 });
 SOCKET.on('your-roll', (data) => {
     game.dice = new Dice(data);
+    trans.roll.start(true);
+});
+SOCKET.on('your-bet', () => {
+    trans.bet.start();
 });
 SOCKET.on('small-bet', () => {
     alert('your bet is too small');
