@@ -5,6 +5,7 @@ if (cookie) SOCKET.emit('auth-cookie', cookie);
 let assets = {}; // stores the assets
 let trans = []; // stores the transformations
 let parts = []; // stores the particles
+let bets = [];
 let mMenu = {}; // the main menu inputs
 let lMenu = {}; // the login menu inputs
 let rMenu = {}; // the register menu inputs
@@ -27,6 +28,10 @@ let game = {
         [[127, 108], [120, 113], [140, 107], [134, 112], [143, 117]],
         [[120, 105], [131, 103], [127, 111], [141, 108], [135, 114]],
     ],
+    bet: {
+        amount: 1,
+        number: 1
+    },
     roll: false,
     rolling: false
 };
@@ -107,6 +112,18 @@ function sketch(p) {
             SOCKET.emit('roll');
             game.rolling = 'place';
         }, p);
+        mMenu.iAmount = new ButtonClass('', 'increase', () => {
+            game.bet.amount++;
+        }, p);
+        mMenu.dAmount = new ButtonClass('', 'decrease', () => {
+            if (game.bet.amount > 1) game.bet.amount--;
+        }, p);
+        mMenu.iNumber = new ButtonClass('', 'increase', () => {
+            game.bet.number == 6 ? game.bet.number = 1 : game.bet.number++;
+        }, p);
+        mMenu.dNumber = new ButtonClass('', 'decrease', () => {
+            game.bet.number == 1 ? game.bet.number = 6 : game.bet.number--;
+        }, p);
 
         // the login menu username input
         lMenu.username = new InputClass('text', 'username', 'input', 20, p);
@@ -165,8 +182,6 @@ function sketch(p) {
         let b2 = img.button2;
         let i = img.input;
         let s = img.scroll;
-
-        console.log(b1);
 
         // MAIN MENU TRANSFORMS
         new Transform('play', b1.cx, b1.ol, 40, 4, () => {
@@ -322,15 +337,17 @@ function sketch(p) {
                 if (game.roomInfo.owner == game.username)
                     mMenu.start.draw(trans.scroll.cur + 1, 106, scale);
             }
-            if (game.roomInfo.status == 'roll') {
+            
+            if (game.roomInfo.status == 'roll' && !game.dice) {
                 mMenu.roll.draw(img.button2.left, img.button2.bottom, scale);
             }
             if (game.rolling == 'place') {
                 anim.place_13.draw(0, 0, 2, 'place', scale, false, false);
                 if (anim.place_13.finished('place')) {
                     game.rolling = 'peek';
-
-
+                    parts = [];
+                    anim.peek_4.reset('peek');
+                    anim.place_13.reset('place');
                 }
             }
             if (game.rolling == 'peek') {
@@ -343,6 +360,25 @@ function sketch(p) {
                         new DicePart(coords.x, coords.y, num, d);
                     }
                 }
+            }
+
+            if (game.roomInfo.status == 'betting') {
+                
+                mMenu.iAmount.draw(210, 100, scale);
+                img.display.draw(210, 110, scale);
+                mMenu.dAmount.draw(210, 142, scale);
+
+                p.textSize(10 * scale);
+                p.fill(255, 255, 255);
+                p.textAlign(p.CENTER, p.CENTER);
+                p.text(`${game.bet.amount}`, 226 * scale, 126 * scale);
+
+                mMenu.iNumber.draw(244, 100, scale);
+                img.display.draw(244, 110, scale);
+                mMenu.dNumber.draw(244, 142, scale);
+
+                img[`big_${game.bet.number}`].draw(251, 117, scale);
+                
             }
 
             for (let p of parts) {
@@ -375,11 +411,6 @@ function sketch(p) {
             (trans.banner.cur + img.banner.h / 2) * scale,
         );
 
-        /*if (p.mouseIsPressed && newClick) {
-            console.log(`${p.mouseX / scale}, ${p.mouseY / scale}`);
-            newClick = false;
-        }*/
-
     };
     p.windowResized = function () {
         p.resizeCanvas(p.windowWidth, p.windowHeight);
@@ -398,6 +429,10 @@ function sketch(p) {
     p.mouseReleased = function () {
         setTimeout(() => { newClick = true }, 500);
     }
+    p.mouseWheel = function(event) {
+    }
+    p.mouseDragged = function () {
+    };
 }
 
 function getCookie(key) { // fetches a cookie based on a value
@@ -459,6 +494,9 @@ class AnimationClass {
     }
     finished(id) {
         return this.instances[id] == (this.frameCount - 1) * 10;
+    }
+    reset (id) {
+        if (this.instances[id]) this.instances[id] = 0;
     }
 }
 class ImageClass {
@@ -682,9 +720,11 @@ class DicePart {
             y: this.img.bottom - 1
         };
 
-        this.maxSpeed = 100;
-        this.ySpeed = -3;
+        this.maxYSpeed = this.dest.y - this.y + 10;
+        this.ySpeed = -5;
         this.yAcc = 0.5;
+
+        this.maxXSpeed = Math.abs(this.dest.x - this.x);
         this.xSpeed = 1;
         this.xAcc = 1;
         this.dir = Math.sign(this.dest.x - this.x);
@@ -721,8 +761,8 @@ class DicePart {
         }
 
         
-        if (this.xSpeed < this.maxSpeed) this.xSpeed += this.xAcc;
-        if (this.ySpeed < this.maxSpeed) this.ySpeed += this.yAcc;
+        if (this.xSpeed < this.maxXSpeed) this.xSpeed += this.xAcc;
+        if (this.ySpeed < this.maxYSpeed) this.ySpeed += this.yAcc;
     }
 }
 

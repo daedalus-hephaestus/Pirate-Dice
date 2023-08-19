@@ -324,7 +324,6 @@ export class Player {
 		return {
 			username: this.username,
 			diceCount: this.diceCount,
-			id: this.socketID,
 			rolled: this.rolled,
 			out: this.out,
 		};
