@@ -14,6 +14,7 @@ let anim;
 let img;
 
 let newClick = true; // whether or not the current click is a new click
+let drag = false;
 let center; // stores the center point of the canvas
 let scale; // stores the pixel scale
 
@@ -34,7 +35,8 @@ let game = {
     },
     roll: false,
     rolling: false,
-    betY: 0
+    betY: 0,
+    betYSave: 0
 };
 
 
@@ -276,12 +278,17 @@ function sketch(p) {
         });
 
         // GAME MENU TRANSFORMS
-        new Transform('scroll', s.ol, s.top, 40, 4, () => { }, () => {
+        new Transform('scroll', s.ol, s.left, 40, 4, () => {
+            trans.start.start();
+        }, () => {
+            trans.start.start(true);
+        });
+        new Transform('start', b2.ol, b2.left, 40, 4, () => { }, () => {
             if (game.roomInfo.status == 'roll') {
                 trans.roll.start();
             } else {
-                trans.back.start(true);
-            }
+                trans.back.start(true)
+            };
         });
         new Transform('roll', b2.ol, b2.left, 40, 4, () => { }, () => { });
         new Transform('bet', p.windowHeight, 107, 40, 4, () => { }, () => { });
@@ -349,11 +356,19 @@ function sketch(p) {
             let playerCount = game.roomInfo.players.length;
             for (let i = 0; i < playerCount; i++) {
                 let player = game.roomInfo.players[i];
+
+                p.fill("#541d29");
+                if (i == game.roomInfo.turn && game.roomInfo.status == 'betting')
+                    p.fill(255, 0, 0);
+                if (game.roomInfo.status == 'roll' && !player.rolled)
+                    p.fill(255, 0, 0);
+
+
                 let label = `${player.username}         ${player.diceCount}`;
                 p.text(label, xc, (i * 6 + 46) * scale);
             }
             if (game.roomInfo.owner == game.username)
-                mMenu.start.draw(trans.scroll.cur + 1, 106, scale);
+                mMenu.start.draw(trans.start.cur + 1, 106, scale);
 
             // the roll button
             mMenu.roll.draw(trans.roll.cur, img.button2.bottom, scale);
@@ -361,9 +376,39 @@ function sketch(p) {
             img.bets.draw(trans.betScroll.cur, img.bets.bottom, scale);
 
             for (let i = 0; i < game.roomInfo.bets.length; i++) {
-                console.log(game.roomInfo.bets);
+                let bet = game.roomInfo.bets[i];
+
+                let label = `${bet.username}: ${bet.amount}   ${bet.number}`;
+                if (bet.amount != 1) label += '\'s'; 4
+
+                p.textAlign(p.LEFT, p.TOP);
+                p.textSize(6 * scale);
+                p.fill('#541d29');
+
+                let y = (78 + i * 8 + game.betY) * scale;
+
+                if (y > 146 * scale && !drag)
+                    game.betY--;
+
+                if (y > 70 * scale)
+                    p.text(label, (trans.betScroll.cur + 4) * scale, y);
             }
 
+            // draws the top of the bet scroll
+            img.top.draw(trans.betScroll.cur, img.bets.bottom, scale);
+
+            let x = p.mouseX > trans.betScroll.cur * scale;
+            let width = p.mouseX < (trans.betScroll.cur + img.bets.w) * scale;
+            let y = p.mouseY > img.bets.bottom * scale;
+            let height = p.mouseY < (img.bets.h + img.bets.bottom) * scale;
+            let hover = x && width && y && height;
+
+            if (drag != false && hover) {
+                game.betY = game.betYSave;
+                game.betY += (p.mouseY - drag) / scale;
+            }
+
+            if (game.betY > 0) game.betY = 0;
 
             // the roll animations
             if (game.rolling == 'place') {
@@ -439,7 +484,6 @@ function sketch(p) {
             center.x * scale,
             (trans.banner.cur + img.banner.h / 2) * scale,
         );
-
     };
     p.windowResized = function () {
         p.resizeCanvas(p.windowWidth, p.windowHeight);
@@ -450,6 +494,7 @@ function sketch(p) {
         scale = p.windowWidth / assets.images.table.image.width;
     }
     p.mousePressed = function () {
+        game.betYSave = game.betY;
         if (newClick && game.bannerText) {
             newClick = false;
             trans.banner.start(true);
@@ -457,10 +502,11 @@ function sketch(p) {
     };
     p.mouseReleased = function () {
         setTimeout(() => { newClick = true }, 500);
+        game.betYSave = game.betY;
+        drag = false;
     }
-    p.mouseWheel = function (event) {
-    }
-    p.mouseDragged = function () {
+    p.mouseDragged = function (event) {
+        if (!drag) drag = p.mouseY;
     };
 }
 
@@ -829,7 +875,7 @@ SOCKET.on('delete-cookie', () => {
 });
 SOCKET.on('room-update', (data) => {
     if (game.roomInfo.status == 'waiting' && data.status == 'roll') {
-        trans.scroll.start(true);
+        trans.start.start(true);
     }
     if (game.roomInfo.status == 'roll' && data.status == 'betting') {
         trans.betScroll.start();
